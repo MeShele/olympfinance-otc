@@ -13,18 +13,18 @@ const Hero = () => {
   const hero = data?.hero ?? defaultHero;
 
   return (
-    <section id="exchange" className="relative min-h-screen pt-28 sm:pt-36 pb-20 overflow-x-hidden">
+    <section id="exchange" className="relative min-h-screen pt-28 sm:pt-36 pb-20 overflow-hidden">
       {/* Background grid */}
       <div className="absolute inset-0 bg-grid-pattern bg-[size:60px_60px] opacity-[0.03] dark:opacity-[0.08]" />
 
       {/* Gradient orbs */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] blur-3xl" style={{ background: `radial-gradient(circle, hsl(var(--primary) / 0.1), transparent)` }} />
-      <div className="absolute bottom-0 right-0 w-[600px] h-[600px] blur-3xl" style={{ background: `radial-gradient(circle, hsl(var(--accent) / 0.08), transparent)` }} />
+      <div className="hidden sm:block absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] blur-3xl" style={{ background: `radial-gradient(circle, hsl(var(--primary) / 0.1), transparent)` }} />
+      <div className="hidden sm:block absolute bottom-0 right-0 w-[600px] h-[600px] blur-3xl" style={{ background: `radial-gradient(circle, hsl(var(--accent) / 0.08), transparent)` }} />
 
       {/* Floating orbs */}
-      <div className="absolute top-1/4 left-10 w-20 h-20 rounded-full bg-orb-primary-10 animate-float blur-xl" />
-      <div className="absolute top-1/3 right-20 w-32 h-32 rounded-full bg-orb-accent animate-float blur-xl" style={{ animationDelay: '2s' }} />
-      <div className="absolute bottom-1/4 left-1/4 w-24 h-24 rounded-full bg-orb-primary-10 animate-float blur-xl" style={{ animationDelay: '4s' }} />
+      <div className="hidden sm:block absolute top-1/4 left-10 w-20 h-20 rounded-full bg-orb-primary-10 animate-float blur-xl" />
+      <div className="hidden sm:block absolute top-1/3 right-20 w-32 h-32 rounded-full bg-orb-accent animate-float blur-xl" style={{ animationDelay: '2s' }} />
+      <div className="hidden sm:block absolute bottom-1/4 left-1/4 w-24 h-24 rounded-full bg-orb-primary-10 animate-float blur-xl" style={{ animationDelay: '4s' }} />
 
       <div className="container mx-auto px-4 sm:px-6 relative">
         <div className="grid lg:grid-cols-12 gap-12 lg:gap-16 items-center">
