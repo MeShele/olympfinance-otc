@@ -1,7 +1,9 @@
-import { Loader2, RefreshCw, FileText, Clock, CheckCircle2, XCircle, CircleDollarSign } from "lucide-react";
+import { Loader2, RefreshCw, FileText, Clock, CheckCircle2, XCircle, CircleDollarSign, LayoutGrid, Table as TableIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useOrders } from "@/hooks/useOrders";
 import OrdersTable from "@/components/admin/OrdersTable";
+import OrdersKanban from "@/components/admin/OrdersKanban";
 import { RequirePermission } from "@/components/admin/RequirePermission";
 
 export default function AdminOrders() {
@@ -85,31 +87,52 @@ export default function AdminOrders() {
           </div>
         </div>
 
-        {/* Table */}
+        {/* Tabs: Kanban (default) / Table */}
         <div className="admin-card">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-primary" />
-              <h2 className="text-xl font-semibold text-foreground">Управление заявками</h2>
+          <Tabs defaultValue="kanban">
+            <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-primary" />
+                <h2 className="text-xl font-semibold text-foreground">Управление заявками</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <TabsList>
+                  <TabsTrigger value="kanban" className="gap-1.5">
+                    <LayoutGrid className="w-4 h-4" />
+                    Канбан
+                  </TabsTrigger>
+                  <TabsTrigger value="table" className="gap-1.5">
+                    <TableIcon className="w-4 h-4" />
+                    Таблица
+                  </TabsTrigger>
+                </TabsList>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refetch()}
+                  className="border-border text-foreground hover:text-foreground hover:bg-muted"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Обновить
+                </Button>
+              </div>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetch()}
-              className="border-border text-foreground hover:text-foreground hover:bg-muted"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Обновить
-            </Button>
-          </div>
 
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            </div>
-          ) : (
-            <OrdersTable orders={orders} />
-          )}
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <>
+                <TabsContent value="kanban" className="mt-0">
+                  <OrdersKanban orders={orders} />
+                </TabsContent>
+                <TabsContent value="table" className="mt-0">
+                  <OrdersTable orders={orders} />
+                </TabsContent>
+              </>
+            )}
+          </Tabs>
         </div>
       </div>
     </RequirePermission>

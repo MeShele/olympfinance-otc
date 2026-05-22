@@ -103,6 +103,25 @@ export const useConfirmPayment = () => {
   });
 };
 
+export const useMarkOrderCompleted = () => {
+  const operatorId = useOperatorId();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, txHash }: { id: string; txHash?: string }) => {
+      const { error } = await supabase.rpc("mark_order_completed" as never, {
+        p_order_id: id,
+        p_payout_tx_hash: txHash?.trim() || null,
+      } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orders", operatorId] });
+      queryClient.invalidateQueries({ queryKey: ["user-orders"] });
+    },
+  });
+};
+
 export const useDeleteOrder = () => {
   const operatorId = useOperatorId();
   const queryClient = useQueryClient();

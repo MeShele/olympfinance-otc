@@ -2,13 +2,13 @@
  * Single source-of-truth for `orders.status` → user-visible label + color intent.
  *
  * Every component that renders an order status — client /orders page,
- * admin OrdersTable, future superadmin views — imports from here instead
- * of maintaining its own mapping. Two parallel maps drifted in the past
- * (missing `paid` on both sides) and rendered paid orders as "Ожидает
- * оплаты". Consolidating here is the owner-layer fix.
+ * admin OrdersTable, OrdersKanban — imports from here.
  *
- * Concrete icons / Tailwind classes stay local to each renderer — colors
- * and labels are authoritative here, visual chrome is a per-surface call.
+ * Стадии (для группировки в Kanban):
+ *   - waiting       — ждём клиента (он ещё не подтвердил оплату)
+ *   - action_needed — мяч у админа: клиент сказал что оплатил, нужно выдать
+ *   - done          — закрыт успешно
+ *   - failed        — отменён, истёк, или редкий paid (legacy)
  */
 
 export const ORDER_STATUSES = [
@@ -25,24 +25,37 @@ export type OrderStatus = (typeof ORDER_STATUSES)[number]
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   awaiting_payment: 'Ожидает оплаты',
-  pending: 'Ожидает обработки',
-  paid: 'Оплачено',
-  processing: 'В обработке',
+  pending: 'Ожидает оплаты',
+  paid: 'Оплачено (legacy)',
+  // processing в OTC = клиент нажал "Я оплатил", мяч у админа
+  processing: 'Ожидает выдачи',
   completed: 'Завершён',
   cancelled: 'Отменён',
   expired: 'Истёк',
 }
 
-export type OrderStatusColor = 'amber' | 'emerald' | 'blue' | 'red' | 'gray'
+export type OrderStatusColor = 'amber' | 'emerald' | 'blue' | 'red' | 'gray' | 'orange'
 
 export const ORDER_STATUS_COLOR: Record<OrderStatus, OrderStatusColor> = {
   awaiting_payment: 'amber',
   pending: 'amber',
-  paid: 'emerald',
-  processing: 'blue',
+  paid: 'gray',
+  processing: 'orange',
   completed: 'emerald',
   cancelled: 'red',
   expired: 'red',
+}
+
+export type OrderStage = 'waiting' | 'action_needed' | 'done' | 'failed'
+
+export const ORDER_STATUS_STAGE: Record<OrderStatus, OrderStage> = {
+  awaiting_payment: 'waiting',
+  pending: 'waiting',
+  processing: 'action_needed',
+  completed: 'done',
+  paid: 'failed',
+  cancelled: 'failed',
+  expired: 'failed',
 }
 
 export function getOrderStatusLabel(status: string): string {
@@ -51,4 +64,8 @@ export function getOrderStatusLabel(status: string): string {
 
 export function getOrderStatusColor(status: string): OrderStatusColor {
   return (ORDER_STATUS_COLOR as Record<string, OrderStatusColor>)[status] ?? 'gray'
+}
+
+export function getOrderStage(status: string): OrderStage {
+  return (ORDER_STATUS_STAGE as Record<string, OrderStage>)[status] ?? 'failed'
 }

@@ -1,10 +1,9 @@
-import { useState, useMemo } from "react";
-import { Trash2, Check, X, ArrowRight, Download, FileText, Loader2, AlertTriangle, Timer, CheckCircle2 } from "lucide-react";
+import { useState } from "react";
+import { Trash2, Check, X, ArrowRight, Download, FileText, Loader2, AlertTriangle, Timer, CheckCircle2, Hourglass, MoreVertical } from "lucide-react";
 import {
   ORDER_STATUSES,
   ORDER_STATUS_LABELS,
   getOrderStatusColor,
-  getOrderStatusLabel,
   type OrderStatus,
   type OrderStatusColor,
 } from "@/lib/orderStatus";
@@ -22,8 +21,18 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Order, useUpdateOrderStatus, useDeleteOrder } from "@/hooks/useOrders";
+import PayoutConfirmDialog from "@/components/admin/PayoutConfirmDialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -31,9 +40,9 @@ import { generateOrderNumber } from "@/utils/orderDocument";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { buildCompanyData } from "@/utils/pdf/companyData";
 import type { CompanyData } from "@/utils/pdf/types";
-import { generateAndSaveOrderPDF, getDocumentDownloadUrl } from "@/utils/pdf/documentService";
 import { supabase } from "@/integrations/supabase/client";
 import { useOperatorId } from "@/hooks/useOperatorId";
+import { downloadOrderPDF } from "@/utils/orderPdfDownload";
 import {
   parseBankInfo,
   parsePaymentInfo,
@@ -65,17 +74,18 @@ const parseUserNotes = (notes: string | null): string | null => {
 // in orderStatus.ts — the dropdown and cell rendering pick it up
 // automatically via the map derivation below.
 const STATUS_BG_BY_COLOR: Record<OrderStatusColor, string> = {
-  amber: "bg-orange-500/10 text-orange-400 border-orange-500/20",
+  amber: "bg-amber-500/10 text-amber-400 border-amber-500/20",
   emerald: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
   blue: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  orange: "bg-orange-500/15 text-orange-400 border-orange-500/30",
   red: "bg-red-500/10 text-red-400 border-red-500/20",
   gray: "bg-secondary/40 text-muted-foreground border-border/20",
 };
 const STATUS_ICON_BY_STATUS: Record<OrderStatus, React.ReactNode> = {
   awaiting_payment: <Timer className="w-3 h-3" />,
   pending: <Timer className="w-3 h-3" />,
-  paid: <CheckCircle2 className="w-3 h-3" />,
-  processing: <ArrowRight className="w-3 h-3" />,
+  paid: <AlertTriangle className="w-3 h-3" />,
+  processing: <Hourglass className="w-3 h-3" />,
   completed: <Check className="w-3 h-3" />,
   cancelled: <X className="w-3 h-3" />,
   expired: <AlertTriangle className="w-3 h-3" />,
@@ -132,6 +142,8 @@ const OrdersTable = ({ orders }: OrdersTableProps) => {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [payoutOrder, setPayoutOrder] = useState<Order | null>(null);
+  const [advancedOrder, setAdvancedOrder] = useState<Order | null>(null);
   const { data: companySettings } = useCompanySettings();
   const company = companySettings ? buildCompanyData(companySettings) : DEFAULT_COMPANY;
   const operatorId = useOperatorId();
@@ -168,124 +180,7 @@ const OrdersTable = ({ orders }: OrdersTableProps) => {
   const handleDownloadPDF = async (order: Order) => {
     setDownloadingId(order.id);
     try {
-      // Try to get existing document from storage
-      try {
-        const { data: existingDoc } = await supabase
-          .from("documents")
-          .select("storage_path, file_name")
-          .eq("order_id", order.id)
-          .eq("type", "order_pdf")
-          .limit(1)
-          .maybeSingle();
-
-        if (existingDoc) {
-          const url = await getDocumentDownloadUrl(existingDoc.storage_path);
-          const link = document.createElement("a");
-          link.href = url;
-          link.download = existingDoc.file_name;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          return;
-        }
-      } catch {
-        // Storage/documents query failed — fall through to direct generation
-      }
-
-      // Build order data for PDF
-      const orderNumber = generateOrderNumber(order.id, order.created_at);
-      const paymentInfo = parsePaymentInfo(order.notes);
-      const bankInfo = parseBankInfo(order.notes);
-      const operatorWallet = paymentInfo?.wallet_address || '';
-      const isSell = isSellOrder(order);
-
-      let bankAccountInfo: string | undefined;
-      if (!isSell && order.notes) {
-        try {
-          const parsed = JSON.parse(order.notes);
-          if (parsed?.payment?.bank_details) {
-            bankAccountInfo = parsed.payment.bank_details;
-          }
-        } catch { /* ignore */ }
-      }
-
-      // Pull latest KYC so the admin PDF carries the full identity block
-      // (same flattening logic as the client /orders page).
-      let kyc: import('@/utils/pdf/types').KycData | undefined;
-      if (order.user_id) {
-        const { data: kycRow } = await supabase
-          .from('kyc_verifications')
-          .select('document_number, document_type, document_country, ocr_data, verification_method, verified_at')
-          .eq('user_id', order.user_id)
-          .order('updated_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (kycRow) {
-          const ocr = (kycRow.ocr_data ?? {}) as Record<string, unknown>;
-          const pick = (k: string) => (typeof ocr[k] === 'string' && (ocr[k] as string).trim() ? (ocr[k] as string) : undefined);
-          const first = pick('first_name');
-          const last = pick('last_name');
-          const middle = pick('patronymic') ?? pick('middle_name');
-          kyc = {
-            fullName: pick('full_name') ?? ([last, first, middle].filter(Boolean).join(' ') || undefined),
-            firstName: first, lastName: last, middleName: middle,
-            dateOfBirth: pick('date_of_birth'),
-            country: pick('country') ?? (kycRow.document_country ?? undefined),
-            documentType: pick('document_type') ?? (kycRow.document_type ?? undefined),
-            documentNumber: pick('document_number') ?? (kycRow.document_number ?? undefined),
-            documentSeries: pick('document_series'),
-            personalNumber: pick('personal_number') ?? pick('pin'),
-            issuedDate: pick('issued_date') ?? pick('date_of_issue'),
-            expiryDate: pick('expired_date') ?? pick('date_of_expiry'),
-            authority: pick('authority') ?? pick('issued_by'),
-            address: pick('address'),
-            verificationMethod: kycRow.verification_method ?? undefined,
-            verifiedAt: kycRow.verified_at ?? undefined,
-          };
-        }
-      }
-
-      const orderData = {
-        id: order.id,
-        orderNumber,
-        createdAt: order.created_at,
-        clientName: kyc?.fullName || order.contact_info || 'Клиент',
-        clientContact: order.contact_info || '',
-        fromAmount: order.from_amount,
-        fromCurrency: order.from_currency,
-        toAmount: order.to_amount,
-        toCurrency: order.to_currency,
-        rate: order.rate,
-        walletAddress: isSell ? '' : (order.wallet_address || ''),
-        operatorWallet,
-        status: order.status,
-        fee: (order as { fee?: number }).fee ?? undefined,
-        cardNumber: isSell ? (order.wallet_address || '') : undefined,
-        bankName: bankInfo?.bank_name,
-        recipientName: bankInfo?.recipient_name || (kyc?.fullName) || (isSell ? (order.contact_info || 'Клиент') : undefined),
-        senderWallet: bankInfo?.sender_wallet,
-        networkName: order.network || undefined,
-        bankAccountInfo,
-        kyc,
-      };
-
-      // Try to save to storage, fall back to direct download
-      try {
-        const savedDoc = await generateAndSaveOrderPDF(
-          orderData, company, operatorId, order.user_id, true
-        );
-        const url = await getDocumentDownloadUrl(savedDoc.storage_path);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = savedDoc.file_name;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } catch {
-        // Storage save failed — generate and download directly
-        const { generateOrderPDF } = await import("@/utils/pdf/generator");
-        await generateOrderPDF(orderData, company, true);
-      }
+      await downloadOrderPDF(order, company, operatorId);
     } catch (error) {
       console.error('Failed to generate PDF:', error);
       toast.error("Ошибка", { description: "Не удалось сгенерировать PDF" });
@@ -399,33 +294,23 @@ const OrdersTable = ({ orders }: OrdersTableProps) => {
                   )}
                 </td>
                 <td className="py-4 px-5">
-                  <Select
-                    value={order.status}
-                    onValueChange={(value) => handleStatusChange(order.id, value)}
-                    disabled={updatingId === order.id}
-                  >
-                    <SelectTrigger className="w-[160px] h-8 border-border">
-                      <SelectValue>
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium border ${status.className}`}>
-                          {status.icon}
-                          {status.label}
-                        </span>
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(statusConfig).map(([key, config]) => (
-                        <SelectItem key={key} value={key}>
-                          <div className="flex items-center gap-2">
-                            {config.icon}
-                            {config.label}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium border ${status.className}`}>
+                    {status.icon}
+                    {status.label}
+                  </span>
                 </td>
                 <td className="py-4 px-5">
                   <div className="flex items-center justify-end gap-2">
+                    {order.status === "processing" && (
+                      <Button
+                        size="sm"
+                        onClick={() => setPayoutOrder(order)}
+                        className="h-8 gap-1.5"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Подтвердить выплату
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -449,15 +334,29 @@ const OrdersTable = ({ orders }: OrdersTableProps) => {
                         <Download className="w-4 h-4" />
                       )}
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(order)}
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      title="Удалить"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" title="Ещё">
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => setAdvancedOrder(order)}
+                          disabled={updatingId === order.id}
+                        >
+                          Изменить статус вручную
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleDelete(order)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Удалить заявку
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </td>
               </tr>
@@ -465,6 +364,59 @@ const OrdersTable = ({ orders }: OrdersTableProps) => {
           })}
         </tbody>
       </table>
+
+      {/* Payout confirmation */}
+      <PayoutConfirmDialog order={payoutOrder} onClose={() => setPayoutOrder(null)} />
+
+      {/* Advanced manual status change — escape hatch для крайних случаев */}
+      <Dialog open={!!advancedOrder} onOpenChange={() => setAdvancedOrder(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              Изменить статус вручную
+            </DialogTitle>
+            <DialogDescription>
+              Используй только если стандартный флоу сломался. Обычный путь — кнопка «Подтвердить выплату».
+              Прямая смена статуса не пишет tx-hash в аудит.
+            </DialogDescription>
+          </DialogHeader>
+          {advancedOrder && (
+            <div className="space-y-3">
+              <div className="text-sm text-muted-foreground">
+                Заявка <span className="font-mono">#{advancedOrder.id.slice(0, 8)}</span> · текущий статус:{" "}
+                <strong>{statusConfig[advancedOrder.status]?.label ?? advancedOrder.status}</strong>
+              </div>
+              <Select
+                value={advancedOrder.status}
+                onValueChange={async (value) => {
+                  await handleStatusChange(advancedOrder.id, value);
+                  setAdvancedOrder(null);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Новый статус" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(statusConfig).map(([key, config]) => (
+                    <SelectItem key={key} value={key}>
+                      <div className="flex items-center gap-2">
+                        {config.icon}
+                        {config.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAdvancedOrder(null)}>
+              Закрыть
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Order Details Dialog */}
       <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
