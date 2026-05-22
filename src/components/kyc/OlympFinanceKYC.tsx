@@ -322,7 +322,7 @@ export default function OlympFinanceKYC({ open, onOpenChange, onComplete }: Olym
               <AlertTriangle className="w-16 h-16 text-amber-400 mx-auto mb-3" />
               <h3 className="text-lg font-bold text-amber-400">Заявка отправлена</h3>
               <p className="text-sm text-muted-foreground mt-2">
-                Ваши документы переданы на проверку. Оператор обработает заявку и пришлёт результат на email.
+                Ваша заявка отправлена оператору на проверку. Статус будет обновлён в вашем личном кабинете в течение 24 часов.
               </p>
               <p className="text-xs text-muted-foreground mt-3">Обычно проверка занимает до 24 часов.</p>
             </div>

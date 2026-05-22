@@ -6,6 +6,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
+ARG CACHEBUST=default
+RUN echo "Cache bust: ${CACHEBUST}"
+
 COPY . .
 
 # Vite embeds these at build time. Real values can be passed as build
