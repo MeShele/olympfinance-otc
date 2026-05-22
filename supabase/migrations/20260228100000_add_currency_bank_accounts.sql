@@ -1,0 +1,1 @@
+ALTER TABLE public.currencies ADD COLUMN IF NOT EXISTS bank_accounts TEXT DEFAULT NULL;

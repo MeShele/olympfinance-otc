@@ -1,0 +1,25 @@
+services:
+  # Olymp Finance OTC exchange — single static container, talks to Cloud Supabase
+  # for everything (auth, REST, edge functions). No Postgres / Kong /
+  # GoTrue here — those live in the Supabase project.
+  #
+  # Routing:
+  #   - On Coolify, SERVICE_FQDN_EXCHANGE_80 picks up the domain set in
+  #     the Coolify UI and Caddy auto-issues SSL.
+  #   - On a bare-metal install (install.sh), nginx on the host (or any
+  #     reverse proxy) forwards 443 → 8080 here.
+  exchange:
+    container_name: olympfinance-exchange
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+        - VITE_SUPABASE_PUBLISHABLE_KEY=${VITE_SUPABASE_PUBLISHABLE_KEY}
+    environment:
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+      - VITE_SUPABASE_PUBLISHABLE_KEY=${VITE_SUPABASE_PUBLISHABLE_KEY}
+      - SERVICE_FQDN_EXCHANGE_80
+    ports:
+      - "127.0.0.1:8080:80"
+    restart: unless-stopped

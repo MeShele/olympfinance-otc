@@ -1,0 +1,16 @@
+project_id = "olympfinance-otc"
+
+# Manual KYC review with risk scoring (legacy slug `asystem-kyc`
+# kept to avoid breaking existing kyc_verifications.method values).
+# Auth verified internally via Supabase client.
+[functions.asystem-kyc]
+verify_jwt = false
+
+# Staff member creation — called by operator_admin from frontend.
+# Creates auth user internally with service role.
+[functions.create-staff-member]
+verify_jwt = false
+
+# NBKR rates — public currency rate API, no auth needed.
+[functions.nbkr-rates]
+verify_jwt = false

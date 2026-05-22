@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40" fill="none">
+  <rect width="120" height="40" rx="8" fill="#0D1117"/>
+  <circle cx="20" cy="20" r="10" fill="#E11D48"/>
+  <path d="M15 20l3 3 7-7" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="36" y="18" font-family="Arial,sans-serif" font-size="9" font-weight="700" fill="#FFFFFF">Namba</text>
+  <text x="36" y="30" font-family="Arial,sans-serif" font-size="9" font-weight="700" fill="#E11D48">Pay</text>
+</svg>

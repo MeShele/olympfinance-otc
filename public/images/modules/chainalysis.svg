@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 40" fill="none">
+  <rect width="130" height="40" rx="8" fill="#0D1117"/>
+  <path d="M12 26c3-8 6-12 9-12s6 4 9 12" stroke="#F97316" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M15 26c2-6 4-9 6-9s4 3 6 9" stroke="#F97316" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+  <text x="36" y="24" font-family="Arial,sans-serif" font-size="9" font-weight="700" fill="#FFFFFF">Chainalysis</text>
+</svg>

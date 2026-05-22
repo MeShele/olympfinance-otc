@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40" fill="none">
+  <rect width="120" height="40" rx="8" fill="#0D1117"/>
+  <path d="M16 28c0-10 4-16 8-16s4 4 4 8c0-4 0-8 4-8s8 6 8 16" stroke="#F59E0B" stroke-width="2" stroke-linecap="round" fill="none"/>
+  <text x="44" y="24" font-family="Arial,sans-serif" font-size="9" font-weight="700" fill="#FFFFFF">Fireblocks</text>
+</svg>

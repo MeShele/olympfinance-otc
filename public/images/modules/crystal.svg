@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 40" fill="none">
+  <rect width="110" height="40" rx="8" fill="#0D1117"/>
+  <path d="M20 10l8 10-8 10-8-10z" fill="none" stroke="#06B6D4" stroke-width="2"/>
+  <path d="M20 14l4 6-4 6-4-6z" fill="#06B6D4" opacity="0.3"/>
+  <text x="34" y="24" font-family="Arial,sans-serif" font-size="10" font-weight="700" fill="#FFFFFF">Crystal</text>
+</svg>
