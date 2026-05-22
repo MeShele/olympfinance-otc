@@ -1,7 +1,7 @@
-import { useState, useRef, useCallback } from "react";
+import { useState } from "react";
 import {
-  Loader2, Camera, Upload, CheckCircle2, XCircle, Shield,
-  FileText, User, AlertTriangle, ScanFace,
+  Loader2, Upload, XCircle, Shield,
+  FileText, AlertTriangle, ScanFace,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,12 @@ const COUNTRIES = [
   { value: "TJK", label: "Таджикистан" },
 ];
 
+/**
+ * OTC-KYC: упрощённый flow без liveness/camera. Клиент загружает фото
+ * документа + селфи как обычные file inputs, оператор проверяет вручную
+ * в /admin/compliance. Liveness и face-match не валидируются автоматически —
+ * это работа оператора.
+ */
 export default function OlympFinanceKYC({ open, onOpenChange, onComplete }: OlympFinanceKYCProps) {
   const { user } = useAuth();
   const [step, setStep] = useState<Step>("intro");
@@ -54,12 +60,6 @@ export default function OlympFinanceKYC({ open, onOpenChange, onComplete }: Olym
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
   const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
 
-  // Liveness
-  const [livenessStep, setLivenessStep] = useState<"idle" | "blink" | "turn" | "done">("idle");
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-
-  // Result
   const [processing, setProcessing] = useState(false);
 
   const handleFileSelect = (
@@ -79,71 +79,26 @@ export default function OlympFinanceKYC({ open, onOpenChange, onComplete }: Olym
     reader.readAsDataURL(file);
   };
 
-  // Simplified liveness: start camera, user performs actions
-  const startLiveness = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-      setLivenessStep("blink");
-
-      // Simulate liveness steps (in production: use face-api.js for real detection)
-      setTimeout(() => setLivenessStep("turn"), 2500);
-      setTimeout(() => {
-        setLivenessStep("done");
-        // Capture selfie from video
-        if (videoRef.current) {
-          const canvas = document.createElement("canvas");
-          canvas.width = videoRef.current.videoWidth;
-          canvas.height = videoRef.current.videoHeight;
-          canvas.getContext("2d")?.drawImage(videoRef.current, 0, 0);
-          canvas.toBlob((blob) => {
-            if (blob) {
-              const file = new File([blob], "selfie.jpg", { type: "image/jpeg" });
-              setSelfieFile(file);
-              setSelfiePreview(canvas.toDataURL("image/jpeg"));
-            }
-          }, "image/jpeg", 0.8);
-        }
-        // Stop camera
-        stream.getTracks().forEach((t) => t.stop());
-      }, 5000);
-    } catch (err) {
-      toast.error("Не удалось включить камеру");
-      console.error(err);
-    }
-  };
-
-  const stopCamera = () => {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-  };
-
   const handleSubmit = async () => {
     if (!user || !documentFile || !selfieFile) return;
     setProcessing(true);
     setStep("processing");
 
     try {
-      // 1. Init verification
       await invokeEdgeFunction("asystem-kyc", { action: "init" });
 
-      // 2. Upload document
       const docPath = `${user.id}/document_${Date.now()}.jpg`;
       const { error: docUpErr } = await supabase.storage
         .from("kyc-documents")
         .upload(docPath, documentFile, { contentType: documentFile.type });
       if (docUpErr) throw new Error("Ошибка загрузки документа");
 
-      // 3. Upload selfie
       const selfiePath = `${user.id}/selfie_${Date.now()}.jpg`;
       const { error: selfieUpErr } = await supabase.storage
         .from("kyc-documents")
         .upload(selfiePath, selfieFile, { contentType: selfieFile.type });
       if (selfieUpErr) throw new Error("Ошибка загрузки селфи");
 
-      // 4. Verify — submit personal data + document/selfie URLs for human review
       const result = await invokeEdgeFunction<{ decision: string; pending_review: boolean }>(
         "asystem-kyc",
         {
@@ -156,7 +111,9 @@ export default function OlympFinanceKYC({ open, onOpenChange, onComplete }: Olym
           full_name: fullName,
           phone,
           date_of_birth: dob,
-          liveness_passed: livenessStep === "done",
+          // liveness_passed: не валидируем автоматически — оператор смотрит
+          // глазами при ручной проверке в /admin/compliance.
+          liveness_passed: null,
           ocr_data: {
             full_name: fullName,
             document_number: docNumber,
@@ -187,12 +144,10 @@ export default function OlympFinanceKYC({ open, onOpenChange, onComplete }: Olym
     setDocumentPreview(null);
     setSelfieFile(null);
     setSelfiePreview(null);
-    setLivenessStep("idle");
-    stopCamera();
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) { reset(); stopCamera(); } onOpenChange(v); }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -201,16 +156,15 @@ export default function OlympFinanceKYC({ open, onOpenChange, onComplete }: Olym
           </DialogTitle>
         </DialogHeader>
 
-        {/* INTRO */}
         {step === "intro" && (
           <div className="space-y-4">
             <div className="p-4 rounded-lg bg-primary/5 border border-primary/10">
               <h3 className="font-semibold text-sm mb-2">Для работы с обменником нужна верификация</h3>
               <ul className="text-xs text-muted-foreground space-y-1">
                 <li>1. Заполните личные данные</li>
-                <li>2. Сфотографируйте документ</li>
-                <li>3. Пройдите проверку лица (liveness)</li>
-                <li>4. Получите результат автоматически</li>
+                <li>2. Загрузите фото документа</li>
+                <li>3. Загрузите селфи с документом в руках</li>
+                <li>4. Дождитесь проверки оператором (до 24 часов)</li>
               </ul>
             </div>
             <p className="text-[11px] text-muted-foreground">
@@ -222,7 +176,6 @@ export default function OlympFinanceKYC({ open, onOpenChange, onComplete }: Olym
           </div>
         )}
 
-        {/* PERSONAL DATA */}
         {step === "personal" && (
           <div className="space-y-3">
             <div>
@@ -273,7 +226,6 @@ export default function OlympFinanceKYC({ open, onOpenChange, onComplete }: Olym
           </div>
         )}
 
-        {/* DOCUMENT UPLOAD */}
         {step === "document" && (
           <div className="space-y-4">
             <div className="text-center">
@@ -302,65 +254,45 @@ export default function OlympFinanceKYC({ open, onOpenChange, onComplete }: Olym
             )}
 
             <Button onClick={() => setStep("selfie")} disabled={!documentFile} className="w-full">
-              Далее — Проверка лица
+              Далее — Селфи
             </Button>
           </div>
         )}
 
-        {/* SELFIE + LIVENESS */}
         {step === "selfie" && (
           <div className="space-y-4">
             <div className="text-center">
               <ScanFace className="w-10 h-10 text-primary mx-auto mb-2" />
-              <h3 className="font-semibold text-sm">Проверка лица</h3>
-              <p className="text-xs text-muted-foreground">Камера сделает фото и проверит что вы реальный человек</p>
+              <h3 className="font-semibold text-sm">Селфи с документом</h3>
+              <p className="text-xs text-muted-foreground">
+                Сделайте фото где видно ваше лицо и документ в руке. Это нужно
+                чтобы оператор подтвердил что документ принадлежит вам.
+              </p>
             </div>
 
-            {livenessStep === "idle" && !selfiePreview && (
-              <Button onClick={startLiveness} className="w-full gap-2">
-                <Camera className="w-4 h-4" /> Включить камеру
-              </Button>
-            )}
-
-            {livenessStep !== "idle" && livenessStep !== "done" && (
-              <div className="space-y-3">
-                <div className="relative rounded-xl overflow-hidden bg-black aspect-[4/3]">
-                  <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
-                  <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 p-4">
-                    <p className="text-white text-center font-medium">
-                      {livenessStep === "blink" && "Моргните несколько раз"}
-                      {livenessStep === "turn" && "Поверните голову влево-вправо"}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-2 justify-center">
-                  <div className={`w-2 h-2 rounded-full ${livenessStep === "blink" || livenessStep === "turn" ? "bg-green-400" : "bg-muted"}`} />
-                  <div className={`w-2 h-2 rounded-full ${livenessStep === "turn" ? "bg-green-400" : "bg-muted"}`} />
-                </div>
+            {selfiePreview ? (
+              <div className="relative">
+                <img src={selfiePreview} alt="Селфи" className="w-full rounded-lg border" />
+                <button
+                  onClick={() => { setSelfieFile(null); setSelfiePreview(null); }}
+                  className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"
+                >
+                  <XCircle className="w-4 h-4" />
+                </button>
               </div>
-            )}
-
-            {selfiePreview && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-green-400 text-sm">
-                  <CheckCircle2 className="w-4 h-4" /> Liveness пройден
-                </div>
-                <img src={selfiePreview} alt="Селфи" className="w-32 h-32 rounded-full object-cover mx-auto border-2 border-green-500/30" />
-              </div>
-            )}
-
-            {/* Manual selfie upload fallback */}
-            {livenessStep === "idle" && (
-              <div className="text-center">
-                <p className="text-[10px] text-muted-foreground mb-2">Или загрузите селфи вручную</p>
-                <label className="text-xs text-primary cursor-pointer underline">
-                  Загрузить файл
-                  <input type="file" className="hidden" accept="image/*" onChange={(e) => {
-                    handleFileSelect(e, setSelfieFile, setSelfiePreview);
-                    setLivenessStep("idle");
-                  }} />
-                </label>
-              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-xl cursor-pointer hover:border-primary/50 transition-colors">
+                <Upload className="w-8 h-8 text-muted-foreground mb-2" />
+                <span className="text-sm text-muted-foreground">Загрузить селфи</span>
+                <span className="text-[10px] text-muted-foreground mt-1">Селфи с документом в руках, JPG/PNG до 10MB</span>
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/*"
+                  capture="user"
+                  onChange={(e) => handleFileSelect(e, setSelfieFile, setSelfiePreview)}
+                />
+              </label>
             )}
 
             <Button
@@ -374,18 +306,16 @@ export default function OlympFinanceKYC({ open, onOpenChange, onComplete }: Olym
           </div>
         )}
 
-        {/* PROCESSING */}
         {step === "processing" && (
           <div className="text-center py-8 space-y-4">
             <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
             <div>
-              <h3 className="font-semibold">Проверяем документы...</h3>
-              <p className="text-xs text-muted-foreground mt-1">Проверка санкционных списков и анализ данных</p>
+              <h3 className="font-semibold">Загружаем документы...</h3>
+              <p className="text-xs text-muted-foreground mt-1">Передаём оператору на проверку</p>
             </div>
           </div>
         )}
 
-        {/* RESULT */}
         {step === "result" && (
           <div className="space-y-4">
             <div className="text-center py-4">
