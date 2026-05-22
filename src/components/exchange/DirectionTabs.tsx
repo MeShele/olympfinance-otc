@@ -18,7 +18,7 @@ const DirectionTabs = ({ direction, onChange }: DirectionTabsProps) => {
         <button
           key={value}
           onClick={() => onChange(value)}
-          className={`flex-1 py-2.5 px-3 rounded-lg font-semibold text-sm transition-all duration-300 ${
+          className={`flex-1 py-2.5 px-1.5 sm:px-3 rounded-lg font-semibold text-xs sm:text-sm transition-all duration-300 whitespace-nowrap min-w-0 ${
             direction === value
               ? "bg-primary text-primary-foreground shadow-lg"
               : "text-muted-foreground hover:text-foreground"

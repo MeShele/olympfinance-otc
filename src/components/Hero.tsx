@@ -13,7 +13,7 @@ const Hero = () => {
   const hero = data?.hero ?? defaultHero;
 
   return (
-    <section id="exchange" className="relative min-h-screen pt-28 sm:pt-36 pb-20 overflow-hidden">
+    <section id="exchange" className="relative min-h-screen pt-28 sm:pt-36 pb-20 overflow-x-hidden">
       {/* Background grid */}
       <div className="absolute inset-0 bg-grid-pattern bg-[size:60px_60px] opacity-[0.03] dark:opacity-[0.08]" />
 
