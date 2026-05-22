@@ -397,8 +397,8 @@ const ExchangeWidget = () => {
 
   if (isLoading) {
     return (
-      <div className="glass-panel rounded-[32px] p-1.5 w-full max-w-md mx-auto">
-        <div className="bg-card rounded-[28px] p-6 sm:p-8 flex items-center justify-center min-h-[400px]">
+      <div className="glass-panel rounded-[28px] sm:rounded-[32px] p-1 sm:p-1.5 w-full max-w-md mx-auto">
+        <div className="bg-card rounded-[24px] sm:rounded-[28px] p-4 sm:p-8 flex items-center justify-center min-h-[400px]">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       </div>
@@ -407,8 +407,8 @@ const ExchangeWidget = () => {
 
   if (currencies.length === 0 || !fromCurrency || !toCurrency) {
     return (
-      <div className="glass-panel rounded-[32px] p-1.5 w-full max-w-md mx-auto">
-        <div className="bg-card rounded-[28px] p-6 sm:p-8 flex flex-col items-center justify-center min-h-[400px] gap-3 text-muted-foreground">
+      <div className="glass-panel rounded-[28px] sm:rounded-[32px] p-1 sm:p-1.5 w-full max-w-md mx-auto">
+        <div className="bg-card rounded-[24px] sm:rounded-[28px] p-4 sm:p-8 flex flex-col items-center justify-center min-h-[400px] gap-3 text-muted-foreground">
           <p className="text-sm">Валюты не настроены</p>
           <p className="text-xs">Администратор должен добавить валюты в панели управления.</p>
         </div>
@@ -417,7 +417,7 @@ const ExchangeWidget = () => {
   }
 
   return (
-    <div className="glass-panel rounded-[32px] p-1.5 w-full max-w-md mx-auto animate-scale-in"><div className="bg-card rounded-[28px] p-6 sm:p-8">
+    <div className="glass-panel rounded-[28px] sm:rounded-[32px] p-1 sm:p-1.5 w-full max-w-md mx-auto animate-scale-in"><div className="bg-card rounded-[24px] sm:rounded-[28px] p-4 sm:p-8">
       {/* Direction Toggle */}
       <DirectionTabs direction={direction} onChange={handleDirectionChange} />
 

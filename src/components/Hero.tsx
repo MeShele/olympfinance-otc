@@ -27,9 +27,9 @@ const Hero = () => {
       <div className="hidden sm:block absolute bottom-1/4 left-1/4 w-24 h-24 rounded-full bg-orb-primary-10 animate-float blur-xl" style={{ animationDelay: '4s' }} />
 
       <div className="container mx-auto px-4 sm:px-6 relative">
-        <div className="grid lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-center">
           {/* Left Content */}
-          <div className="lg:col-span-7 text-center lg:text-left">
+          <div className="lg:col-span-7 min-w-0 text-center lg:text-left">
             <ScrollReveal delay={0}>
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-brand-light border-brand border text-sm mb-6 text-primary">
                 <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
@@ -38,7 +38,7 @@ const Hero = () => {
             </ScrollReveal>
 
             <ScrollReveal delay={100}>
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight mb-6">
+              <h1 className="text-xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight mb-6 break-words max-w-full">
                 {hero.title}{" "}
                 <span className="gradient-text">{hero.title_highlight}</span>{" "}
                 {hero.subtitle}
@@ -46,7 +46,7 @@ const Hero = () => {
             </ScrollReveal>
 
             <ScrollReveal delay={200}>
-              <p className="text-lg sm:text-xl text-muted-foreground mb-8 max-w-xl mx-auto lg:mx-0">
+              <p className="text-sm sm:text-base md:text-lg lg:text-xl text-muted-foreground mb-8 max-w-xl mx-auto lg:mx-0 break-words">
                 {hero.description}
               </p>
             </ScrollReveal>
@@ -64,7 +64,7 @@ const Hero = () => {
           </div>
 
           {/* Right Content - Exchange Widget */}
-          <ScrollReveal variant="scale" delay={200} className="lg:col-span-5">
+          <ScrollReveal variant="scale" delay={200} className="lg:col-span-5 min-w-0">
             <ExchangeWidget />
           </ScrollReveal>
         </div>
