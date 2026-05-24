@@ -9,6 +9,7 @@ import { EmailStep } from '@/components/auth/EmailStep';
 import { PasswordStep } from '@/components/auth/PasswordStep';
 import { OTPStep } from '@/components/auth/OTPStep';
 import ResidencyChoice from '@/components/auth/ResidencyChoice';
+import RelationshipPurposeChoice, { type RelationshipPurpose } from '@/components/auth/RelationshipPurposeChoice';
 import { useBrandingContext, useThemeLogo } from '@/contexts/BrandingContext';
 import { translateAuthError } from '@/lib/authErrors';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,7 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 const emailSchema = z.string().email('Введите корректный email');
 const passwordSchema = z.string().min(6, 'Пароль должен содержать минимум 6 символов');
 
-type AuthStep = 'email' | 'password' | 'otp' | 'residency';
+type AuthStep = 'email' | 'password' | 'otp' | 'residency' | 'purpose';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -35,7 +36,7 @@ const Auth = () => {
   const logoUrl = useThemeLogo();
 
   useEffect(() => {
-    if (!loading && user && step !== 'residency') {
+    if (!loading && user && step !== 'residency' && step !== 'purpose') {
       navigate('/');
     }
   }, [user, loading, navigate, step]);
@@ -156,15 +157,36 @@ const Auth = () => {
   const handleResidencySubmit = async (isResident: boolean) => {
     setIsLoading(true);
     try {
-      const currentUser = user;
-      if (!currentUser) {
+      if (!user) {
         navigate('/');
         return;
       }
       const { error } = await supabase
         .from('profiles')
         .update({ is_resident: isResident })
-        .eq('user_id', currentUser.id);
+        .eq('user_id', user.id);
+      if (error) {
+        toast.error('Не удалось сохранить', { description: error.message });
+        return;
+      }
+      // Переходим к следующему шагу — цель деловых отношений
+      setStep('purpose');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePurposeSubmit = async (purpose: RelationshipPurpose) => {
+    setIsLoading(true);
+    try {
+      if (!user) {
+        navigate('/');
+        return;
+      }
+      const { error } = await supabase
+        .from('profiles')
+        .update({ relationship_purpose: purpose })
+        .eq('user_id', user.id);
       if (error) {
         toast.error('Не удалось сохранить', { description: error.message });
         return;
@@ -226,15 +248,18 @@ const Auth = () => {
               ? 'Подтверждение email'
               : step === 'residency'
                 ? 'Резидентство'
-                : isLogin
-                  ? 'Вход в аккаунт'
-                  : 'Создание аккаунта'}
+                : step === 'purpose'
+                  ? 'Цель использования'
+                  : isLogin
+                    ? 'Вход в аккаунт'
+                    : 'Создание аккаунта'}
           </h1>
           <p className="text-muted-foreground text-center mb-8">
             {step === 'email' && (isLogin ? 'Введите email для входа' : 'Введите email для регистрации')}
             {step === 'password' && (isLogin ? 'Введите пароль' : 'Создайте пароль')}
             {step === 'otp' && 'Введите код из письма'}
-            {step === 'residency' && 'Последний шаг — для отчётности'}
+            {step === 'residency' && 'Резидентство для отчётности ГСФР'}
+            {step === 'purpose' && 'Зачем вам обменник?'}
           </p>
 
           {/* Form Steps */}
@@ -286,6 +311,13 @@ const Auth = () => {
             {step === 'residency' && (
               <ResidencyChoice
                 onSubmit={handleResidencySubmit}
+                isLoading={isLoading}
+              />
+            )}
+
+            {step === 'purpose' && (
+              <RelationshipPurposeChoice
+                onSubmit={handlePurposeSubmit}
                 isLoading={isLoading}
               />
             )}

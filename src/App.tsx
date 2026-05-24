@@ -10,6 +10,7 @@ import { ApprovalProvider } from "@/contexts/ApprovalContext";
 import { Loader2 } from "lucide-react";
 import { QuizProvider } from "@/components/QuizContext";
 import { ResidencyGate } from "@/components/ResidencyGate";
+import { RelationshipPurposeGate } from "@/components/RelationshipPurposeGate";
 
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -30,6 +31,7 @@ const AdminCompliance = lazy(() => import("./pages/admin/AdminCompliance"));
 const AdminCompanyInfo = lazy(() => import("./pages/admin/AdminCompanyInfo"));
 const AdminCommission = lazy(() => import("./pages/admin/AdminCommission"));
 const AdminReports = lazy(() => import("./pages/admin/AdminReports"));
+const AdminComplianceData = lazy(() => import("./pages/admin/AdminComplianceData"));
 const AdminStaffRoles = lazy(() => import("./pages/admin/AdminStaffRoles"));
 const AdminStaffMembers = lazy(() => import("./pages/admin/AdminStaffMembers"));
 const AdminLegalPages = lazy(() => import("./pages/admin/AdminLegalPages"));
@@ -55,6 +57,7 @@ const App = () => (
               <ApprovalProvider>
                 <QuizProvider>
                 <ResidencyGate />
+                <RelationshipPurposeGate />
                 <Suspense fallback={<SuspenseFallback />}>
                   <Routes>
                     <Route path="/" element={<Index />} />
@@ -74,6 +77,7 @@ const App = () => (
                       <Route path="company" element={<AdminCompanyInfo />} />
                       <Route path="commission" element={<AdminCommission />} />
                       <Route path="reports" element={<AdminReports />} />
+                      <Route path="compliance-data" element={<AdminComplianceData />} />
                       <Route path="staff-roles" element={<AdminStaffRoles />} />
                       <Route path="staff" element={<AdminStaffMembers />} />
                       <Route path="legal" element={<AdminLegalPages />} />

@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { mergePaymentIntoNotes } from "./orderUtils";
+import { extractPaymentMethod } from "@/utils/orderNotes";
 
 interface SwapOrderParams {
   userId: string;
@@ -67,6 +68,7 @@ export async function executeSwapOrder(params: SwapOrderParams) {
       fee: params.feeAmount,
       network: params.network || null,
       amount_kgs: params.amountKgs,
+      payment_method: extractPaymentMethod(params.notes) ?? 'cashless',
     })
     .select()
     .single();

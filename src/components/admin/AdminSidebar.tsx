@@ -45,6 +45,7 @@ const operationsItems: MenuItem[] = [
   { title: "Заявки", url: "/admin", icon: FileText, section: "orders" },
   { title: "Курсы валют", url: "/admin/currencies", icon: Coins, section: "currencies" },
   { title: "Отчёты", url: "/admin/reports", icon: FileSpreadsheet, section: "reports" },
+  { title: "Данные для отчётов", url: "/admin/compliance-data", icon: FileSpreadsheet, section: "reports" },
 ];
 
 const complianceItems: MenuItem[] = [

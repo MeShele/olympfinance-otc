@@ -195,7 +195,7 @@ export const buildSellSheet = (
           formatRate(order.from_currency, order.to_currency, order.rate),
           `${order.to_amount.toLocaleString('ru-RU')} ${order.to_currency}`,
           order.amount_kgs > 0 ? order.amount_kgs.toLocaleString('ru-RU') : '-',
-          getPaymentMethod(order.notes),
+          getPaymentMethod(order),
           operatorWallet,
           clientWallet,
           order.profiles?.is_verified ? 'да' : 'нет',
@@ -268,7 +268,7 @@ export const buildBuySheet = (
 
   for (let idx = 0; idx < totalDataRows; idx++) {
     const order = dataOrders[idx];
-    const paymentMethod = order ? (getBankFromNotes(order.notes) || getPaymentMethod(order.notes)) : '-';
+    const paymentMethod = order ? (getBankFromNotes(order.notes) || getPaymentMethod(order)) : '-';
     const values = order
       ? [
           idx + 1,
@@ -425,6 +425,15 @@ export const buildExchangeSheet = (
     const row = ws.getRow(r);
     const exchangeColWidths = [3, 8, 5, 5, 16, 16, 9, 9, 9, 9, 11, 9, 11, 9, 13, 13, 13, 13, 5, 5];
 
+    // ГСФР 6/о требует объёмы в сомах для обеих сторон. amount_kgs обычно
+    // фиксирует объём операции по первой ноге. ВА2 — после комиссии (нетто).
+    const va1Kgs = order.amount_kgs;
+    const fee = (order as { fee?: number }).fee ?? 0;
+    const feeKgs = fee > 0 && order.from_amount > 0
+      ? va1Kgs * (fee / order.from_amount)
+      : 0;
+    const va2Kgs = Math.max(0, va1Kgs - feeKgs);
+
     const values = order
       ? [
           idx + 1,
@@ -438,9 +447,9 @@ export const buildExchangeSheet = (
           order.rate.toFixed(6),
           '1',
           order.from_amount.toString(),
-          order.amount_kgs > 0 ? order.amount_kgs.toLocaleString('ru-RU') : '-',
+          va1Kgs > 0 ? va1Kgs.toLocaleString('ru-RU', { maximumFractionDigits: 2 }) : '-',
           order.to_amount.toString(),
-          order.amount_kgs > 0 ? order.amount_kgs.toLocaleString('ru-RU') : '-',
+          va2Kgs > 0 ? va2Kgs.toLocaleString('ru-RU', { maximumFractionDigits: 2 }) : '-',
           operatorWallet,
           lpWallet,
           order.wallet_address || '-',

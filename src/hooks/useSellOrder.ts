@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { invokeEdgeFunction } from "@/lib/edgeInvoke";
 import { mergePaymentIntoNotes } from "./orderUtils";
+import { extractPaymentMethod } from "@/utils/orderNotes";
 
 interface SellOrderParams {
   userId: string;
@@ -118,6 +119,7 @@ async function executeManualSell(
       fee: params.feeAmount,
       network: params.network,
       amount_kgs: params.amountKgs,
+      payment_method: extractPaymentMethod(params.notes) ?? 'cashless',
     })
     .select('id')
     .single();
@@ -157,6 +159,7 @@ async function executeAcquiringSell(params: SellOrderParams, pendingPayment: any
       fee: params.feeAmount,
       network: params.network,
       amount_kgs: params.amountKgs,
+      payment_method: extractPaymentMethod(params.notes) ?? 'cashless',
     });
 
   try {

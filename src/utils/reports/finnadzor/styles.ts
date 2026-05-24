@@ -196,15 +196,41 @@ export const formatClientName = (order: OrderData): string => {
   return name;
 };
 
-export const getPaymentMethod = (notes: string | null): string => {
+/**
+ * Метод расчёта для Приложений 4/о, 5/о (колонка 9).
+ *
+ * Приоритет:
+ *   1. order.payment_method (структурированное поле, заполняется через
+ *      форму заказа с RES-фичи).
+ *   2. order.notes.paymentMethod (legacy: парсим из JSON).
+ *   3. fallback 'безналичный'.
+ */
+export const getPaymentMethod = (
+  notesOrOrder: string | null | { payment_method?: string | null; notes?: string | null },
+): string => {
+  // Новый сигнатура: получили целый order
+  if (notesOrOrder && typeof notesOrOrder === 'object') {
+    const pm = (notesOrOrder as { payment_method?: string | null }).payment_method;
+    if (pm === 'cash') return 'наличный';
+    if (pm === 'cashless') return 'безналичный';
+    // legacy fallback
+    return parseFromNotes((notesOrOrder as { notes?: string | null }).notes ?? null);
+  }
+  // Legacy сигнатура: получили строку notes
+  return parseFromNotes(notesOrOrder as string | null);
+};
+
+function parseFromNotes(notes: string | null): string {
   if (!notes) return 'безналичный';
   try {
     const parsed = JSON.parse(notes);
-    return parsed.paymentMethod || 'безналичный';
+    const v = parsed.paymentMethod;
+    if (v === 'cash') return 'наличный';
+    return 'безналичный';
   } catch {
     return 'безналичный';
   }
-};
+}
 
 /**
  * Резидентство для ГСФР-отчётов.

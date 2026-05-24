@@ -29,6 +29,10 @@ export interface EnrichedOrder {
   kyc_full_name: string | null;
   /** Резидентство клиента: явно указанное в profiles, fallback на kyc_country=='KGZ'. */
   is_resident: boolean | null;
+  /** Метод расчёта (Приложения 4/о, 5/о колонка 9): cash | cashless | null. */
+  payment_method: string | null;
+  /** Цель деловых отношений (ст. 21.1.2): personal_use, investment, ... */
+  relationship_purpose: string | null;
 }
 
 export const useReportData = () => {
@@ -44,7 +48,7 @@ export const useReportData = () => {
           .order("created_at", { ascending: false }),
         supabase
           .from("profiles")
-          .select("user_id, full_name, email, is_verified, is_resident")
+          .select("user_id, full_name, email, is_verified, is_resident, relationship_purpose")
           .eq("operator_id", operatorId),
         supabase
           .from("kyc_verifications")
@@ -94,6 +98,8 @@ export const useReportData = () => {
           document_number: kyc?.document_number || null,
           kyc_full_name: kycFullName,
           is_resident: (profile as { is_resident?: boolean | null })?.is_resident ?? null,
+          payment_method: (order as { payment_method?: string | null }).payment_method ?? null,
+          relationship_purpose: (profile as { relationship_purpose?: string | null })?.relationship_purpose ?? null,
         };
       });
 

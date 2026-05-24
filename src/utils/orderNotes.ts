@@ -35,6 +35,22 @@ export interface BuyPaymentInfo {
   expiresAt?: string;
 }
 
+/**
+ * Достаёт `payment_method` ('cash' | 'cashless') из notes JSON.
+ * Возвращает null если поля нет (для legacy ордеров).
+ */
+export const extractPaymentMethod = (notes: string | null | undefined): 'cash' | 'cashless' | null => {
+  if (!notes) return null;
+  try {
+    const parsed = JSON.parse(notes);
+    const v = parsed?.paymentMethod;
+    if (v === 'cash' || v === 'cashless') return v;
+    return null;
+  } catch {
+    return null;
+  }
+};
+
 export const parsePaymentInfo = (notes: string | null): PaymentInfo | null => {
   if (!notes) return null;
   try {

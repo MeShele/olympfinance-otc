@@ -83,6 +83,9 @@ const OrderFormModal = ({ open, onOpenChange, orderData, onSubmit, adminWallets,
   const [recipientName, setRecipientName] = useState("");
   const [contactInfo, setContactInfo] = useState("");
   const [notes, setNotes] = useState("");
+  // ГСФР Приложения 4/о, 5/о требуют признака «наличный/безналичный».
+  // Дефолт: cashless (банк/карта/крипта-перевод), cash — для P2P/OTC.
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "cashless">("cashless");
   const [selectedNetwork, setSelectedNetwork] = useState("");
   /** For SWAP: separate send-side network (fromCurrency) */
   const [selectedFromNetwork, setSelectedFromNetwork] = useState("");
@@ -323,6 +326,7 @@ const OrderFormModal = ({ open, onOpenChange, orderData, onSubmit, adminWallets,
         recipient_name: recipientName.trim(),
         sender_wallet: senderWallet.trim() || undefined,
         user_notes: notes.trim() || undefined,
+        paymentMethod,
       });
     } else if (isSwapDirection) {
       finalNotes = JSON.stringify({
@@ -330,9 +334,13 @@ const OrderFormModal = ({ open, onOpenChange, orderData, onSubmit, adminWallets,
         send_network: selectedFromNetwork || undefined,
         receive_network: selectedToNetwork || undefined,
         user_notes: notes.trim() || undefined,
+        paymentMethod,
       });
     } else {
-      finalNotes = notes.trim() || undefined;
+      finalNotes = JSON.stringify({
+        user_notes: notes.trim() || undefined,
+        paymentMethod,
+      });
     }
 
     setIsSubmitting(true);
@@ -383,6 +391,7 @@ const OrderFormModal = ({ open, onOpenChange, orderData, onSubmit, adminWallets,
     setRecipientName("");
     setContactInfo("");
     setNotes("");
+    setPaymentMethod("cashless");
     setSelectedNetwork("");
     setSelectedFromNetwork("");
     setSelectedToNetwork("");
@@ -998,6 +1007,38 @@ const OrderFormModal = ({ open, onOpenChange, orderData, onSubmit, adminWallets,
               placeholder="Telegram, WhatsApp или email"
               required
             />
+          </div>
+
+          {/* Payment Method (для отчётов ГСФР) */}
+          <div className="space-y-2">
+            <Label>Способ оплаты</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setPaymentMethod("cashless")}
+                className={`p-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
+                  paymentMethod === "cashless"
+                    ? "border-primary bg-primary/5 text-foreground"
+                    : "border-border text-muted-foreground hover:border-primary/40"
+                }`}
+              >
+                Безналичный
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentMethod("cash")}
+                className={`p-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
+                  paymentMethod === "cash"
+                    ? "border-primary bg-primary/5 text-foreground"
+                    : "border-border text-muted-foreground hover:border-primary/40"
+                }`}
+              >
+                Наличный
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Используется в отчётности ГСФР (Приложения 4/о, 5/о).
+            </p>
           </div>
 
           {/* Notes */}
