@@ -353,7 +353,7 @@ export default function AdminCompliance() {
                       <TableCell className="text-muted-foreground text-xs">
                         {user.verification_method === 'biometric-vision' ? 'BV' :
                          user.verification_method === 'sumsub' ? 'SumSub' :
-                         user.verification_method === 'asystem-kyc' ? 'Olymp Finance' :
+                         user.verification_method === 'asystem-kyc' ? 'Fiatex' :
                          user.verification_method || '—'}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
@@ -471,7 +471,7 @@ export default function AdminCompliance() {
                         if (m === 'biometric-vision') return 'Biometric Vision';
                         if (m === 'didit') return 'Didit';
                         if (m === 'sumsub') return 'SumSub';
-                        if (m === 'asystem' || m === 'asystem-kyc') return 'Olymp Finance KYC';
+                        if (m === 'asystem' || m === 'asystem-kyc') return 'Fiatex KYC';
                         if (m) return m;
                         // Legacy rows: infer from ocr_data shape
                         if (detailUser.ocr_data?.bv_status) return 'Biometric Vision';
@@ -529,19 +529,8 @@ export default function AdminCompliance() {
                     <DetailRow label="Адрес регистрации" value={detailUser.ocr_data.address} />
                   )}
 
-                  {/* Scores */}
-                  {(detailUser.face_match_score != null || detailUser.ocr_data?.face_match_score != null) && (
-                    <DetailRow label="Face Match" value={`${((detailUser.face_match_score ?? detailUser.ocr_data?.face_match_score ?? 0) * (detailUser.ocr_data?.face_match_score > 1 ? 1 : 100)).toFixed(1)}%`} />
-                  )}
-                  {detailUser.ocr_data?.liveness_score != null && (
-                    <DetailRow label="Liveness" value={`✓ ${typeof detailUser.ocr_data.liveness_score === 'number' && detailUser.ocr_data.liveness_score > 1 ? detailUser.ocr_data.liveness_score.toFixed(1) : (detailUser.ocr_data.liveness_score * 100).toFixed(1)}%`} />
-                  )}
-                  {detailUser.liveness_passed === true && !detailUser.ocr_data?.liveness_score && (
-                    <DetailRow label="Liveness" value="✓ Пройден" />
-                  )}
-                  {detailUser.liveness_passed === false && (
-                    <DetailRow label="Liveness" value="✗ Не пройден" />
-                  )}
+                  {/* Face Match убран — в OTC liveness flow вырезан, поле всегда пустое или null. */}
+                  {/* Liveness/face-match вырезаны в OTC-flow (file-only KYC). */}
 
                   {/* Features list (Didit) */}
                   {detailUser.ocr_data?.features && Array.isArray(detailUser.ocr_data.features) && (

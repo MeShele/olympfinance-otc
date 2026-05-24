@@ -426,13 +426,18 @@ export const buildExchangeSheet = (
     const exchangeColWidths = [3, 8, 5, 5, 16, 16, 9, 9, 9, 9, 11, 9, 11, 9, 13, 13, 13, 13, 5, 5];
 
     // ГСФР 6/о требует объёмы в сомах для обеих сторон. amount_kgs обычно
-    // фиксирует объём операции по первой ноге. ВА2 — после комиссии (нетто).
-    const va1Kgs = order.amount_kgs;
-    const fee = (order as { fee?: number }).fee ?? 0;
-    const feeKgs = fee > 0 && order.from_amount > 0
-      ? va1Kgs * (fee / order.from_amount)
-      : 0;
-    const va2Kgs = Math.max(0, va1Kgs - feeKgs);
+    // фиксирует объём операции по первой ноге (ВА1). Для ВА2 берём нетто
+    // — вычитаем комиссию пропорционально fee/from_amount.
+    let va1Kgs = 0;
+    let va2Kgs = 0;
+    if (order) {
+      va1Kgs = order.amount_kgs;
+      const fee = (order as { fee?: number }).fee ?? 0;
+      const feeKgs = fee > 0 && order.from_amount > 0
+        ? va1Kgs * (fee / order.from_amount)
+        : 0;
+      va2Kgs = Math.max(0, va1Kgs - feeKgs);
+    }
 
     const values = order
       ? [
