@@ -51,6 +51,19 @@ export const extractPaymentMethod = (notes: string | null | undefined): 'cash' |
   }
 };
 
+/**
+ * Русский ярлык способа оплаты для PDF-чека.
+ * Приоритет на структурированное поле order.payment_method (новые ордера),
+ * fallback на JSON-парсинг notes (legacy).
+ */
+export const formatPaymentMethod = (order: { payment_method?: string | null; notes?: string | null } | null | undefined): string => {
+  if (!order) return '—';
+  const raw = order.payment_method ?? extractPaymentMethod(order.notes);
+  if (raw === 'cash') return 'наличный';
+  if (raw === 'cashless') return 'безналичный';
+  return '—';
+};
+
 export const parsePaymentInfo = (notes: string | null): PaymentInfo | null => {
   if (!notes) return null;
   try {

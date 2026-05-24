@@ -13,6 +13,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useMarkOrderCompleted, type Order } from "@/hooks/useOrders";
+import { useCompanySettings } from "@/hooks/useCompanySettings";
+import { useOperatorId } from "@/hooks/useOperatorId";
+import { buildCompanyData } from "@/utils/pdf/companyData";
+import { saveOrderPdfToStorage } from "@/utils/orderPdfDownload";
 
 interface PayoutConfirmDialogProps {
   order: Order | null;
@@ -24,6 +28,8 @@ const FIAT_CODES = ["RUB", "USD", "EUR", "KGS", "KZT", "UZS"];
 export default function PayoutConfirmDialog({ order, onClose }: PayoutConfirmDialogProps) {
   const [txHash, setTxHash] = useState("");
   const markCompleted = useMarkOrderCompleted();
+  const { data: settings } = useCompanySettings();
+  const operatorId = useOperatorId();
 
   const isCrypto = order?.to_currency && !FIAT_CODES.includes(order.to_currency);
   const hashLabel = isCrypto ? "Хеш транзакции в блокчейне" : "Номер платёжного поручения";
@@ -36,12 +42,22 @@ export default function PayoutConfirmDialog({ order, onClose }: PayoutConfirmDia
     markCompleted.mutate(
       { id: order.id, txHash },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
           toast.success("Выплата подтверждена", {
             description: "Заявка переведена в статус «Завершён»",
           });
           setTxHash("");
           onClose();
+          // Best-effort: автогенерируем PDF и кладём в storage, чтобы клиент
+          // при заходе на /orders сразу видел готовый файл (без on-the-fly).
+          if (settings) {
+            const company = buildCompanyData(settings);
+            void saveOrderPdfToStorage(
+              { ...order, status: "completed" },
+              company,
+              operatorId,
+            );
+          }
         },
         onError: (err: Error) => {
           toast.error("Не удалось подтвердить", { description: err.message });

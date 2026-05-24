@@ -40,6 +40,7 @@ import {
   parsePaymentInfo,
   parseBankInfo,
   parseBuyPaymentInfo,
+  formatPaymentMethod,
 } from "@/utils/orderNotes";
 
 interface Order {
@@ -214,7 +215,7 @@ const OrderHistory = React.forwardRef<
 
   /**
    * Pull the latest KYC verification for the order's user and normalize
-   * identity fields. Providers (BV, Olymp Finance, SumSub, Didit) store different
+   * identity fields. Providers (BV, Fiatex, SumSub, Didit) store different
    * shapes — this is the one place that flattens them into KycData for the
    * PDF template.
    */
@@ -305,6 +306,7 @@ const OrderHistory = React.forwardRef<
       senderWallet: bankInfo?.sender_wallet,
       bankAccountInfo: buyPaymentInfo?.bankDetails,
       networkName: order.network || undefined,
+      paymentMethod: formatPaymentMethod(order as { payment_method?: string | null; notes?: string | null }),
       kyc,
     };
 

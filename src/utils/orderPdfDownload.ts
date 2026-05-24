@@ -1,8 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { generateOrderNumber } from "@/utils/orderDocument";
 import { generateAndSaveOrderPDF, getDocumentDownloadUrl } from "@/utils/pdf/documentService";
-import type { CompanyData, KycData } from "@/utils/pdf/types";
-import { parseBankInfo, parsePaymentInfo } from "@/utils/orderNotes";
+import type { CompanyData, KycData, OrderData } from "@/utils/pdf/types";
+import { parseBankInfo, parsePaymentInfo, formatPaymentMethod } from "@/utils/orderNotes";
 import type { Order } from "@/hooks/useOrders";
 
 const CRYPTO_CODES = ["BTC", "ETH", "USDT", "USDC", "TON", "SOL"];
@@ -12,34 +12,10 @@ const isSell = (o: Order) =>
   CRYPTO_CODES.includes(o.from_currency) && FIAT_CODES.includes(o.to_currency);
 
 /**
- * Скачивает PDF заявки: пробует достать из storage, иначе генерирует на лету.
- * Используется и таблицей (/admin/orders таб «Таблица»), и канбаном.
+ * Собирает orderData для PDF-генератора из БД-ордера + связанного KYC.
+ * Используется и при ручном download, и при автосохранении после completed.
  */
-export async function downloadOrderPDF(
-  order: Order,
-  company: CompanyData,
-  operatorId: string,
-): Promise<void> {
-  // 1. Существующий PDF из storage
-  try {
-    const { data: existingDoc } = await supabase
-      .from("documents")
-      .select("storage_path, file_name")
-      .eq("order_id", order.id)
-      .eq("type", "order_pdf")
-      .limit(1)
-      .maybeSingle();
-
-    if (existingDoc) {
-      const url = await getDocumentDownloadUrl(existingDoc.storage_path);
-      triggerBrowserDownload(url, existingDoc.file_name);
-      return;
-    }
-  } catch {
-    /* fall through */
-  }
-
-  // 2. Generate
+async function buildOrderData(order: Order): Promise<OrderData> {
   const orderNumber = generateOrderNumber(order.id, order.created_at);
   const paymentInfo = parsePaymentInfo(order.notes);
   const bankInfo = parseBankInfo(order.notes);
@@ -89,7 +65,7 @@ export async function downloadOrderPDF(
     }
   }
 
-  const orderData = {
+  return {
     id: order.id,
     orderNumber,
     createdAt: order.created_at,
@@ -110,8 +86,41 @@ export async function downloadOrderPDF(
     senderWallet: bankInfo?.sender_wallet,
     networkName: order.network || undefined,
     bankAccountInfo,
+    paymentMethod: formatPaymentMethod(order),
     kyc,
   };
+}
+
+/**
+ * Скачивает PDF заявки: пробует достать из storage, иначе генерирует на лету.
+ * Используется и таблицей (/admin/orders таб «Таблица»), и канбаном.
+ */
+export async function downloadOrderPDF(
+  order: Order,
+  company: CompanyData,
+  operatorId: string,
+): Promise<void> {
+  // 1. Существующий PDF из storage
+  try {
+    const { data: existingDoc } = await supabase
+      .from("documents")
+      .select("storage_path, file_name")
+      .eq("order_id", order.id)
+      .eq("type", "order_pdf")
+      .limit(1)
+      .maybeSingle();
+
+    if (existingDoc) {
+      const url = await getDocumentDownloadUrl(existingDoc.storage_path);
+      triggerBrowserDownload(url, existingDoc.file_name);
+      return;
+    }
+  } catch {
+    /* fall through */
+  }
+
+  // 2. Generate fresh
+  const orderData = await buildOrderData(order);
 
   try {
     const savedDoc = await generateAndSaveOrderPDF(orderData, company, operatorId, order.user_id, true);
@@ -120,6 +129,39 @@ export async function downloadOrderPDF(
   } catch {
     const { generateOrderPDF } = await import("@/utils/pdf/generator");
     await generateOrderPDF(orderData, company, true);
+  }
+}
+
+/**
+ * Best-effort автосохранение PDF в storage + запись в documents.
+ * Вызывается в админке сразу после mark_order_completed, чтобы клиент при
+ * заходе на /orders сразу видел готовый файл (а не ждал генерации on-the-fly).
+ *
+ * Возвращает true при успехе, false при ошибке. Не бросает — основной flow
+ * (payout) не должен ломаться из-за PDF.
+ */
+export async function saveOrderPdfToStorage(
+  order: Order,
+  company: CompanyData,
+  operatorId: string,
+): Promise<boolean> {
+  try {
+    // Если уже есть — skip (не пересохраняем)
+    const { data: existingDoc } = await supabase
+      .from("documents")
+      .select("id")
+      .eq("order_id", order.id)
+      .eq("type", "order_pdf")
+      .limit(1)
+      .maybeSingle();
+    if (existingDoc) return true;
+
+    const orderData = await buildOrderData(order);
+    await generateAndSaveOrderPDF(orderData, company, operatorId, order.user_id, true);
+    return true;
+  } catch (err) {
+    console.error("[saveOrderPdfToStorage] failed:", err);
+    return false;
   }
 }
 

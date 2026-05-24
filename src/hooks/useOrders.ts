@@ -14,6 +14,7 @@ export interface Order {
   wallet_address: string | null;
   contact_info: string | null;
   notes: string | null;
+  payment_method?: string | null;
   network: string | null;
   created_at: string;
   updated_at: string;
