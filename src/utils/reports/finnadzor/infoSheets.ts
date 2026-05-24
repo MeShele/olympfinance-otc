@@ -341,13 +341,31 @@ export const buildApp3Sheet = (
   });
   r++;
 
+  // Признак "нерезидент" — приоритет на явное profiles.is_resident,
+  // fallback на kyc_country !== 'KGZ' (legacy).
+  const isNonResident = (o: OrderData): boolean => {
+    const ir = (o as { is_resident?: boolean | null }).is_resident;
+    if (ir === false) return true;
+    if (ir === true) return false;
+    return !!(o.kyc_country && o.kyc_country !== 'KGZ');
+  };
+
+  // Распределение по столбцам Приложения 3/о. Если страна неизвестна
+  // (нерезидент без завершённого KYC) — кладём в "другие".
+  const resolveColumn = (o: OrderData): string => {
+    if (o.kyc_country) {
+      const mapped = mapCountryToColumn(o.kyc_country);
+      if (mapped) return mapped;
+    }
+    return 'OTHER';
+  };
+
   // Calculate non-resident data
   const getNonResidentsByCountry = (orders: OrderData[]) => {
     const userCountryMap = new Map<string, string>();
     orders.forEach(o => {
-      if (o.profiles?.email && o.kyc_country && o.kyc_country !== 'KGZ') {
-        const mapped = mapCountryToColumn(o.kyc_country);
-        if (mapped) userCountryMap.set(o.profiles.email, mapped);
+      if (o.profiles?.email && isNonResident(o)) {
+        userCountryMap.set(o.profiles.email, resolveColumn(o));
       }
     });
 
@@ -374,18 +392,16 @@ export const buildApp3Sheet = (
   COUNTRY_KEYS.forEach(k => { newNonRes[k] = 0; });
   const seenNewUsers = new Set<string>();
   filteredOrders.forEach(o => {
-    if (o.profiles?.email && o.kyc_country && o.kyc_country !== 'KGZ') {
+    if (o.profiles?.email && isNonResident(o)) {
       if (seenNewUsers.has(o.profiles.email)) return;
       const first = firstOrderByUser.get(o.profiles.email);
       if (first) {
         const firstDate = new Date(first);
         const periodStart = new Date(filteredOrders[0]?.created_at || '');
         if (firstDate.getMonth() === periodStart.getMonth() && firstDate.getFullYear() === periodStart.getFullYear()) {
-          const mapped = mapCountryToColumn(o.kyc_country);
-          if (mapped) {
-            newNonRes[mapped] = (newNonRes[mapped] || 0) + 1;
-            seenNewUsers.add(o.profiles.email);
-          }
+          const col = resolveColumn(o);
+          newNonRes[col] = (newNonRes[col] || 0) + 1;
+          seenNewUsers.add(o.profiles.email);
         }
       }
     }
