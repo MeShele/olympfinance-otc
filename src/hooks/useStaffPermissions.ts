@@ -8,8 +8,6 @@ export type StaffSection =
   | "currencies"
   | "reports"
   | "compliance"
-  | "compliance_data"
-  | "compliance_workspace"
   | "company"
   | "commission";
 export type StaffAction = "view" | "edit" | "create" | "delete";
@@ -28,19 +26,9 @@ const ALL_SECTIONS: StaffSection[] = [
   "currencies",
   "reports",
   "compliance",
-  "compliance_data",
-  "compliance_workspace",
   "company",
   "commission",
 ];
-
-/**
- * `compliance_workspace` is the gate to the dedicated compliance-officer
- * dashboard at /compliance — separate from the operator admin's KYC list
- * at /admin/compliance. Used to drive post-login redirect for users whose
- * job is exclusively compliance review (per ГСФР TZ).
- */
-export const COMPLIANCE_WORKSPACE_SECTION: StaffSection = "compliance_workspace";
 
 const allTrue: SectionPermissions = { view: true, edit: true, create: true, delete: true };
 const allFalse: SectionPermissions = { view: false, edit: false, create: false, delete: false };

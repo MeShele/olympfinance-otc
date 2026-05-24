@@ -82,7 +82,7 @@ export const SECTION_GROUPS: SectionGroup[] = [
   {
     key: "compliance",
     label: "Комплайнс",
-    sections: ["compliance", "compliance_data", "compliance_workspace"],
+    sections: ["compliance"],
   },
   {
     key: "settings",
@@ -96,8 +96,6 @@ export const SECTION_LABELS: Record<StaffSection, string> = {
   currencies: "Валюты",
   reports: "Отчёты",
   compliance: "Онбординг / KYC",
-  compliance_data: "Данные комплайнс",
-  compliance_workspace: "Рабочее место комплайнс-офицера",
   company: "О компании",
   commission: "Комиссия",
 };
@@ -107,9 +105,6 @@ export const SECTION_DESCRIPTIONS: Record<StaffSection, string> = {
   currencies: "Список валют, курсы, лимиты, кошельки приёма. Обновление курсов и пар.",
   reports: "Финансовые отчёты для Финнадзора и внутренней аналитики. Экспорт в Excel/PDF.",
   compliance: "Список клиентов с их KYC-статусом. Ручное одобрение или отклонение онбординга.",
-  compliance_data: "Метаданные комплайнс: лицензии, связанные документы, договорная база.",
-  compliance_workspace:
-    "Рабочее место комплайнс-офицера: хиты по спискам ГСФР, мониторинг, видео-сессии, лимиты, алерты.",
   company: "Реквизиты компании, юр. страницы, контент сайта, модули, статус лицензии.",
   commission: "Размер комиссии оператора. Влияет на расчёт курсов в виджете обмена.",
 };
@@ -170,11 +165,9 @@ export const ROLE_PRESETS: RolePreset[] = [
   {
     id: "compliance_officer",
     name: "Комплайнс-офицер",
-    description: "Рабочее место офицера + одобрение KYC. Изолировано от операций и финансов.",
+    description: "Одобрение KYC клиентов. Изолировано от операций и финансов.",
     permissions: buildPermissions({
       compliance: "full",
-      compliance_data: "edit",
-      compliance_workspace: "view",
     }),
   },
   {
@@ -186,8 +179,6 @@ export const ROLE_PRESETS: RolePreset[] = [
       currencies: "full",
       reports: "full",
       compliance: "full",
-      compliance_data: "full",
-      compliance_workspace: "full",
       company: "full",
       commission: "full",
     }),
@@ -201,8 +192,6 @@ export const ROLE_PRESETS: RolePreset[] = [
       currencies: "view",
       reports: "view",
       compliance: "view",
-      compliance_data: "view",
-      compliance_workspace: "view",
       company: "view",
       commission: "view",
     }),

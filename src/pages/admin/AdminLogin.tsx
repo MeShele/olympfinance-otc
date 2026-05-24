@@ -6,33 +6,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
-import { useStaffPermissions, COMPLIANCE_WORKSPACE_SECTION } from "@/hooks/useStaffPermissions";
+import { useStaffPermissions } from "@/hooks/useStaffPermissions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useBrandingContext, useThemeLogo } from "@/contexts/BrandingContext";
+import { translateAuthError } from "@/lib/authErrors";
 
 type AppRole = "admin" | "operator_admin" | "staff" | string | null | undefined;
 
 /**
- * Where to send a freshly-authenticated user.
+ * Где принимаем свежеавторизованного юзера в OTC-форке:
+ *   - admin / operator_admin / staff → /admin (sidebar сам отфильтрует разделы)
+ *   - всё остальное → / (публичный сайт), сессия закрывается.
  *
- * Priority:
- *   1. admin / operator_admin → full admin panel.
- *   2. staff with compliance_workspace.view → dedicated compliance dashboard.
- *      Even if they also have orders/currencies/etc., compliance takes
- *      precedence — that's their job, the operator can drop /admin/* perms
- *      from the role if it's noisy.
- *   3. any other staff (only non-compliance perms) → /admin (the sidebar
- *      auto-filters to what they actually can do).
- *   4. nobody fits → public site (and AdminLogin signs them out).
+ * В main-платформе была отдельная страница /compliance для офицеров,
+ * в OTC выпилена → редиректа на неё больше нет.
  */
-const resolveLandingPath = (
-  role: AppRole,
-  hasComplianceWorkspace: boolean,
-): string => {
-  if (role === "admin" || role === "operator_admin") return "/admin";
-  if (role === "staff" && hasComplianceWorkspace) return "/compliance";
-  if (role === "staff") return "/admin";
+const resolveLandingPath = (role: AppRole): string => {
+  if (role === "admin" || role === "operator_admin" || role === "staff") return "/admin";
   return "/";
 };
 
@@ -42,12 +33,11 @@ export default function AdminLogin() {
   const [isLoading, setIsLoading] = useState(false);
   const { signIn, user, loading: authLoading } = useAuth();
   const { data: role, isLoading: roleLoading } = useUserRole();
-  const { data: permissions, isLoading: permsLoading } = useStaffPermissions();
+  const { isLoading: permsLoading } = useStaffPermissions();
   const navigate = useNavigate();
   const branding = useBrandingContext();
   const logoUrl = useThemeLogo();
 
-  const hasComplianceWorkspace = !!permissions?.[COMPLIANCE_WORKSPACE_SECTION]?.view;
   const canEnter =
     role === "admin" ||
     role === "operator_admin" ||
@@ -57,7 +47,7 @@ export default function AdminLogin() {
     if (authLoading || roleLoading || permsLoading) return;
     if (!user) return;
     if (canEnter) {
-      navigate(resolveLandingPath(role, hasComplianceWorkspace));
+      navigate(resolveLandingPath(role));
       return;
     }
     // Authenticated but no admin / no compliance access — sign out so the
@@ -69,7 +59,7 @@ export default function AdminLogin() {
           "Этот аккаунт не привязан ни к одной роли в админке. Обратитесь к владельцу обменника.",
       });
     });
-  }, [user, authLoading, roleLoading, permsLoading, role, canEnter, hasComplianceWorkspace, navigate]);
+  }, [user, authLoading, roleLoading, permsLoading, role, canEnter, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,7 +74,7 @@ export default function AdminLogin() {
       const { error } = await signIn(email, password);
 
       if (error) {
-        toast.error("Ошибка входа", { description: "Неверный email или пароль" });
+        toast.error("Ошибка входа", { description: translateAuthError(error) });
         return;
       }
 
