@@ -8,12 +8,15 @@ import { z } from 'zod';
 import { EmailStep } from '@/components/auth/EmailStep';
 import { PasswordStep } from '@/components/auth/PasswordStep';
 import { OTPStep } from '@/components/auth/OTPStep';
+import ResidencyChoice from '@/components/auth/ResidencyChoice';
 import { useBrandingContext, useThemeLogo } from '@/contexts/BrandingContext';
+import { translateAuthError } from '@/lib/authErrors';
+import { supabase } from '@/integrations/supabase/client';
 
 const emailSchema = z.string().email('Введите корректный email');
 const passwordSchema = z.string().min(6, 'Пароль должен содержать минимум 6 символов');
 
-type AuthStep = 'email' | 'password' | 'otp';
+type AuthStep = 'email' | 'password' | 'otp' | 'residency';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -32,10 +35,10 @@ const Auth = () => {
   const logoUrl = useThemeLogo();
 
   useEffect(() => {
-    if (!loading && user) {
+    if (!loading && user && step !== 'residency') {
       navigate('/');
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, step]);
 
   const validateEmail = () => {
     try {
@@ -84,11 +87,7 @@ const Auth = () => {
       if (isLogin) {
         const { error } = await signIn(email, password);
         if (error) {
-          if (error.message.includes('Invalid login credentials')) {
-            toast.error('Ошибка входа', { description: 'Неверный email или пароль' });
-          } else {
-            toast.error('Ошибка', { description: error.message });
-          }
+          toast.error('Ошибка входа', { description: translateAuthError(error) });
         } else {
           toast.success('Успешный вход', { description: `Добро пожаловать в ${branding.company_name}!` });
           navigate('/');
@@ -97,15 +96,11 @@ const Auth = () => {
         // Registration
         const { error, data } = await signUp(email, password);
         if (error) {
-          if (error.message.includes('User already registered')) {
-            toast.error('Ошибка регистрации', { description: 'Пользователь с таким email уже существует' });
-          } else {
-            toast.error('Ошибка', { description: error.message });
-          }
+          toast.error('Ошибка регистрации', { description: translateAuthError(error) });
         } else if (data?.session) {
-          // Auto-confirmed — user is already logged in
-          toast.success('Регистрация успешна', { description: `Добро пожаловать в ${branding.company_name}!` });
-          navigate('/');
+          // Auto-confirmed — user is already logged in. Don't navigate yet;
+          // the useEffect-on-user will kick in but we override via step.
+          setStep('residency');
         } else {
           // Email confirmation required — show confirmation message
           toast.success('Подтвердите email', { description: 'Мы отправили ссылку для подтверждения на вашу почту. Перейдите по ней для завершения регистрации.' });
@@ -129,16 +124,9 @@ const Auth = () => {
     try {
       const { error } = await verifyOtp(email, otpCode, 'signup');
       if (error) {
-        if (error.message.includes('expired')) {
-          setErrors(prev => ({ ...prev, otp: 'Код истёк. Запросите новый.' }));
-        } else if (error.message.includes('invalid') || error.message.includes('Invalid')) {
-          setErrors(prev => ({ ...prev, otp: 'Неверный код. Попробуйте снова.' }));
-        } else {
-          setErrors(prev => ({ ...prev, otp: error.message }));
-        }
+        setErrors(prev => ({ ...prev, otp: translateAuthError(error) }));
       } else {
-        toast.success('Регистрация успешна', { description: `Добро пожаловать в ${branding.company_name}!` });
-        navigate('/');
+        setStep('residency');
       }
     } catch (error) {
       toast.error('Ошибка', { description: 'Произошла непредвиденная ошибка' });
@@ -152,7 +140,7 @@ const Auth = () => {
     try {
       const { error } = await resendOtp(email);
       if (error) {
-        toast.error('Ошибка', { description: error.message });
+        toast.error('Ошибка', { description: translateAuthError(error) });
       } else {
         toast.success('Код отправлен', { description: 'Новый код подтверждения отправлен на вашу почту' });
         setOtpCode('');
@@ -160,6 +148,29 @@ const Auth = () => {
       }
     } catch (error) {
       toast.error('Ошибка', { description: 'Не удалось отправить код' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResidencySubmit = async (isResident: boolean) => {
+    setIsLoading(true);
+    try {
+      const currentUser = user;
+      if (!currentUser) {
+        navigate('/');
+        return;
+      }
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_resident: isResident })
+        .eq('user_id', currentUser.id);
+      if (error) {
+        toast.error('Не удалось сохранить', { description: error.message });
+        return;
+      }
+      toast.success('Регистрация завершена', { description: `Добро пожаловать в ${branding.company_name}!` });
+      navigate('/');
     } finally {
       setIsLoading(false);
     }
@@ -213,14 +224,17 @@ const Auth = () => {
           <h1 className="text-2xl font-bold text-center mb-2">
             {step === 'otp'
               ? 'Подтверждение email'
-              : isLogin
-                ? 'Вход в аккаунт'
-                : 'Создание аккаунта'}
+              : step === 'residency'
+                ? 'Резидентство'
+                : isLogin
+                  ? 'Вход в аккаунт'
+                  : 'Создание аккаунта'}
           </h1>
           <p className="text-muted-foreground text-center mb-8">
             {step === 'email' && (isLogin ? 'Введите email для входа' : 'Введите email для регистрации')}
             {step === 'password' && (isLogin ? 'Введите пароль' : 'Создайте пароль')}
             {step === 'otp' && 'Введите код из письма'}
+            {step === 'residency' && 'Последний шаг — для отчётности'}
           </p>
 
           {/* Form Steps */}
@@ -266,6 +280,13 @@ const Auth = () => {
                   setOtpCode('');
                   setErrors(prev => ({ ...prev, otp: undefined }));
                 }}
+              />
+            )}
+
+            {step === 'residency' && (
+              <ResidencyChoice
+                onSubmit={handleResidencySubmit}
+                isLoading={isLoading}
               />
             )}
           </form>

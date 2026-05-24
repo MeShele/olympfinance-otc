@@ -9,6 +9,7 @@ import { BrandingProvider } from "@/contexts/BrandingContext";
 import { ApprovalProvider } from "@/contexts/ApprovalContext";
 import { Loader2 } from "lucide-react";
 import { QuizProvider } from "@/components/QuizContext";
+import { ResidencyGate } from "@/components/ResidencyGate";
 
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -53,6 +54,7 @@ const App = () => (
             <BrandingProvider>
               <ApprovalProvider>
                 <QuizProvider>
+                <ResidencyGate />
                 <Suspense fallback={<SuspenseFallback />}>
                   <Routes>
                     <Route path="/" element={<Index />} />

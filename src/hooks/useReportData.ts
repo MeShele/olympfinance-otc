@@ -27,6 +27,8 @@ export interface EnrichedOrder {
   kyc_country: string | null;
   document_number: string | null;
   kyc_full_name: string | null;
+  /** Резидентство клиента: явно указанное в profiles, fallback на kyc_country=='KGZ'. */
+  is_resident: boolean | null;
 }
 
 export const useReportData = () => {
@@ -42,7 +44,7 @@ export const useReportData = () => {
           .order("created_at", { ascending: false }),
         supabase
           .from("profiles")
-          .select("user_id, full_name, email, is_verified")
+          .select("user_id, full_name, email, is_verified, is_resident")
           .eq("operator_id", operatorId),
         supabase
           .from("kyc_verifications")
@@ -91,6 +93,7 @@ export const useReportData = () => {
           kyc_country: kyc?.document_country || null,
           document_number: kyc?.document_number || null,
           kyc_full_name: kycFullName,
+          is_resident: (profile as { is_resident?: boolean | null })?.is_resident ?? null,
         };
       });
 

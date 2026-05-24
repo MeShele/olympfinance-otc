@@ -206,7 +206,24 @@ export const getPaymentMethod = (notes: string | null): string => {
   }
 };
 
-export const getResidencyStatus = (kyc_country: string | null): string => {
+/**
+ * Резидентство для ГСФР-отчётов.
+ *
+ * Приоритет:
+ *   1. profiles.is_resident — явный выбор клиента при регистрации
+ *      (или через ResidencyGate / админом).
+ *   2. fallback на kyc_country === 'KGZ' для legacy-данных, где
+ *      резидентство ещё не указано.
+ *   3. если ни того ни другого — считаем резидентом (консервативный
+ *      default — в отчёт попадает с пометкой "резидент", потом админ
+ *      исправит вручную).
+ */
+export const getResidencyStatus = (
+  kyc_country: string | null,
+  is_resident?: boolean | null,
+): string => {
+  if (is_resident === true) return 'резидент КР';
+  if (is_resident === false) return 'нерезидент КР';
   if (!kyc_country) return 'резидент КР';
   return kyc_country === 'KGZ' ? 'резидент КР' : 'нерезидент КР';
 };
