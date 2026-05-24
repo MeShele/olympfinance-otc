@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2, Save, Building2, CreditCard, Palette, Upload, Image } from "lucide-react";
+import { Loader2, Save, Building2, CreditCard, Palette, Upload, Image, GraduationCap } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { hslStringToHex } from "@/contexts/BrandingContext";
 import { useCompanySettings, useSaveCompanySettings, CompanySettings } from "@/hooks/useCompanySettings";
 import NetworkWalletField, { NetworkWallet, emptyNetworkWallet, parseNetworkWallets, serializeNetworkWallets } from "@/components/admin/NetworkWalletField";
@@ -64,6 +65,7 @@ const defaultSettings: Omit<CompanySettings, "id" | "fee_percent"> = {
   liquidity_provider_residency: "резидент КР",
   liquidity_provider_wallet: "",
   manual_wallet_address: "",
+  quiz_enabled: true,
   logo_url: "",
   tagline: "",
   primary_color: "#06b6d4",
@@ -84,8 +86,8 @@ const fields: { key: string; label: string; type?: "text" | "textarea" | "number
   { key: "license_date", label: "Дата лицензии", placeholder: "01.01.2025" },
   { key: "tax_office", label: "Управление ГНС", placeholder: "Управление ГНС по Октябрьскому р-ну" },
   { key: "phone", label: "Телефон", placeholder: "+996 ..." },
-  { key: "email", label: "Email", placeholder: "info@olympfinance.kg" },
-  { key: "website", label: "Веб-сайт", placeholder: "olympfinance.kg" },
+  { key: "email", label: "Email", placeholder: "info@fiatex.kg" },
+  { key: "website", label: "Веб-сайт", placeholder: "fiatex.kg" },
   { key: "director_name", label: "ФИО руководителя (полное)", placeholder: "Иванов Иван Иванович" },
   { key: "director_short", label: "ФИО руководителя (сокр.)", placeholder: "Иванов И.И." },
   { key: "director_phone", label: "Телефон руководителя", placeholder: "+996 ..." },
@@ -114,7 +116,7 @@ export default function AdminCompanyInfo() {
     }
   }, [settings]);
 
-  const handleChange = (field: string, value: string | number) => {
+  const handleChange = (field: string, value: string | number | boolean) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -435,6 +437,37 @@ export default function AdminCompanyInfo() {
                       className="mt-1"
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* Модули */}
+              <div className="space-y-4 pt-4 border-t border-border/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                    <GraduationCap className="w-5 h-5 text-amber-500" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">Модули</h3>
+                    <p className="text-sm text-muted-foreground">Включаемые функции обменника</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start justify-between gap-4 p-4 rounded-xl bg-muted/40 border border-border">
+                  <div className="flex-1">
+                    <Label htmlFor="quiz_enabled" className="text-sm font-medium cursor-pointer">
+                      Тест знаний перед обменом
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Клиент проходит короткий тест (4 вопроса о крипте) перед первой сделкой.
+                      Рекомендуется для соответствия требованиям ГСФР КР. Вопросы редактируются в{" "}
+                      <a href="/admin/quiz" className="text-primary hover:underline">/admin/quiz</a>.
+                    </p>
+                  </div>
+                  <Switch
+                    id="quiz_enabled"
+                    checked={!!form.quiz_enabled}
+                    onCheckedChange={(v) => handleChange("quiz_enabled", v)}
+                  />
                 </div>
               </div>
 

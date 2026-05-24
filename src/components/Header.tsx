@@ -1,10 +1,12 @@
-import { Menu, X, LogOut, User, Shield, FileText, ChevronRight } from "lucide-react";
+import { Menu, X, LogOut, User, Shield, FileText, ChevronRight, GraduationCap } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsAdmin } from "@/hooks/useUserRole";
 import { useBrandingContext, useThemeLogo } from "@/contexts/BrandingContext";
+import { useQuizGate } from "@/hooks/useQuizGate";
+import { useQuizModal } from "@/components/QuizContext";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -13,6 +15,8 @@ const Header = () => {
   const navigate = useNavigate();
   const branding = useBrandingContext();
   const logoUrl = useThemeLogo();
+  const { requireQuiz } = useQuizGate();
+  const { openQuiz } = useQuizModal();
 
   const handleSignOut = async () => {
     await signOut();
@@ -21,6 +25,16 @@ const Header = () => {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50">
+      {requireQuiz && (
+        <button
+          onClick={openQuiz}
+          className="w-full bg-amber-500/15 border-b border-amber-500/30 text-amber-700 dark:text-amber-200 text-sm py-2 px-4 flex items-center justify-center gap-2 hover:bg-amber-500/25 transition-colors"
+        >
+          <GraduationCap className="w-4 h-4 shrink-0" />
+          <span className="truncate">Перед обменом пройдите короткий тест знаний</span>
+          <span className="font-semibold underline shrink-0">Пройти →</span>
+        </button>
+      )}
       <div className="backdrop-blur-xl bg-background/70 dark:bg-background/60 border-b border-border/40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 sm:h-[72px]">

@@ -24,6 +24,8 @@ import { toast } from "sonner";
 // here it's a constant.
 const useCanCreateOrder = () => true;
 import { useCoreRates } from "@/hooks/useCoreRates";
+import { useQuizGate } from "@/hooks/useQuizGate";
+import { useQuizModal } from "@/components/QuizContext";
 
 type ExchangeDirection = "buy" | "sell" | "swap";
 
@@ -41,6 +43,8 @@ const ExchangeWidget = () => {
   const isStaff = userRole === "admin" || userRole === "operator_admin" || userRole === "staff";
   const canCreateOrder = useCanCreateOrder();
   const { data: coreRates } = useCoreRates();
+  const { requireQuiz } = useQuizGate();
+  const { openQuiz } = useQuizModal();
 
   // Override crypto rates with live data from core API (Binance)
   const currencies = useMemo(() => {
@@ -306,6 +310,12 @@ const ExchangeWidget = () => {
 
     if (isStaff) {
       toast.error('Сотрудникам недоступен обмен', { description: 'Функции обмена доступны только клиентам' });
+      return;
+    }
+
+    if (requireQuiz) {
+      toast.info('Перед обменом пройдите короткий тест знаний');
+      openQuiz();
       return;
     }
 

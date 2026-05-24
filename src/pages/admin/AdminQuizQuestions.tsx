@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Loader2, Save, Trash2, Plus, HelpCircle } from "lucide-react";
+import { Loader2, Save, Trash2, Plus, HelpCircle, Info } from "lucide-react";
+import { useCompanySettings } from "@/hooks/useCompanySettings";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,6 +46,8 @@ const emptyQuestion = (): QuestionForm => ({
 export default function AdminQuizQuestions() {
   const operatorId = useOperatorId();
   const { data: questions, isLoading } = useAdminQuizQuestions(operatorId);
+  const { data: companySettings } = useCompanySettings();
+  const quizEnabled = companySettings?.quiz_enabled ?? true;
   const { mutate: saveQuestion, isPending: isSaving } = useSaveQuizQuestion();
   const { mutate: deleteQuestion, isPending: isDeleting } = useDeleteQuizQuestion();
   const [newQuestions, setNewQuestions] = useState<QuestionForm[]>([]);
@@ -105,6 +109,20 @@ export default function AdminQuizQuestions() {
   return (
     <RequirePermission section="company">
     <div className="max-w-3xl">
+      {!quizEnabled && (
+        <div className="mb-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
+          <Info className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+          <div className="flex-1 text-sm">
+            <p className="font-medium text-amber-700 dark:text-amber-200">Модуль квиза выключен</p>
+            <p className="text-muted-foreground mt-1">
+              Вопросы ниже не показываются клиентам. Включите модуль в{" "}
+              <Link to="/admin/company" className="text-primary hover:underline font-medium">
+                Настройках компании → Модули
+              </Link>.
+            </p>
+          </div>
+        </div>
+      )}
       <div className="admin-card">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">

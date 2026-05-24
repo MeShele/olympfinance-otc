@@ -38,6 +38,7 @@ export interface CompanySettings {
   acquiring_enabled: boolean;
   manual_wallet_address: string;
   sumsub_enabled: boolean;
+  quiz_enabled: boolean;
   logo_url: string;
   tagline: string;
   primary_color: string;

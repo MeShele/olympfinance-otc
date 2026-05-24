@@ -8,6 +8,7 @@ import { OperatorProvider } from "@/contexts/OperatorContext";
 import { BrandingProvider } from "@/contexts/BrandingContext";
 import { ApprovalProvider } from "@/contexts/ApprovalContext";
 import { Loader2 } from "lucide-react";
+import { QuizProvider } from "@/components/QuizContext";
 
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -51,6 +52,7 @@ const App = () => (
           <OperatorProvider>
             <BrandingProvider>
               <ApprovalProvider>
+                <QuizProvider>
                 <Suspense fallback={<SuspenseFallback />}>
                   <Routes>
                     <Route path="/" element={<Index />} />
@@ -80,6 +82,7 @@ const App = () => (
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </Suspense>
+                </QuizProvider>
               </ApprovalProvider>
             </BrandingProvider>
           </OperatorProvider>
