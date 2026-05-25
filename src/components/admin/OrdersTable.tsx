@@ -657,6 +657,19 @@ const OrderDetailsContent = ({
             <p className="font-medium bg-secondary/50 p-2 rounded">{userNotes}</p>
           </div>
         )}
+        {order.receipt_url && (
+          <div>
+            <p className="text-muted-foreground">Чек оплаты от клиента</p>
+            <a
+              href={order.receipt_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-primary hover:underline inline-flex items-center gap-1"
+            >
+              📎 Открыть чек
+            </a>
+          </div>
+        )}
       </div>
 
       <Button 

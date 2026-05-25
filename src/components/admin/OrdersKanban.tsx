@@ -1,5 +1,22 @@
 import { useMemo, useState } from "react";
 import {
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDraggable,
+  useDroppable,
+} from "@dnd-kit/core";
+import { useUpdateOrderStatus } from "@/hooks/useOrders";
+import {
+  Select as SelectStatus,
+  SelectContent as SelectStatusContent,
+  SelectItem as SelectStatusItem,
+  SelectTrigger as SelectStatusTrigger,
+  SelectValue as SelectStatusValue,
+} from "@/components/ui/select";
+import {
   Timer,
   Hourglass,
   CheckCircle2,
@@ -9,6 +26,7 @@ import {
   ArrowRight,
   Loader2,
   Eye,
+  Paperclip,
 } from "lucide-react";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -97,10 +115,55 @@ export default function OrdersKanban({ orders }: OrdersKanbanProps) {
   const { data: companySettings } = useCompanySettings();
   const company = companySettings ? buildCompanyData(companySettings) : DEFAULT_COMPANY;
   const operatorId = useOperatorId();
+  const updateStatus = useUpdateOrderStatus();
 
   const [detailsOrder, setDetailsOrder] = useState<Order | null>(null);
   const [payoutOrder, setPayoutOrder] = useState<Order | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [failedDropOrder, setFailedDropOrder] = useState<Order | null>(null);
+
+  // PointerSensor с distance: чтобы клики по кнопкам внутри карточки не
+  // регистрировались как drag-start.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const orderId = event.active.id as string;
+    const targetCol = event.over?.id as ColumnKey | undefined;
+    if (!targetCol) return;
+
+    const order = orders.find((o) => o.id === orderId);
+    if (!order) return;
+
+    const srcCol = COLUMNS.find((c) => c.statuses.includes(order.status))?.key ?? "failed";
+    if (srcCol === targetCol) return;
+
+    // action_needed → done: только через PayoutConfirmDialog (нужен tx-hash для аудита)
+    if (targetCol === "done" && order.status === "processing") {
+      setPayoutOrder(order);
+      return;
+    }
+
+    // → failed: даём выбрать cancelled / expired через мини-меню
+    if (targetCol === "failed") {
+      setFailedDropOrder(order);
+      return;
+    }
+
+    // Простые переходы: → awaiting_payment / → processing / → completed (если ордер уже paid и т.п.)
+    const targetStatus =
+      targetCol === "waiting" ? "awaiting_payment" :
+      targetCol === "action_needed" ? "processing" :
+      targetCol === "done" ? "completed" : null;
+
+    if (!targetStatus) return;
+    updateStatus.mutate(
+      { id: order.id, status: targetStatus },
+      {
+        onSuccess: () => toast.success("Статус обновлён"),
+        onError: (e: Error) => toast.error("Не удалось", { description: e.message }),
+      }
+    );
+  };
 
   const grouped = useMemo(() => {
     const byKey: Record<ColumnKey, Order[]> = {
@@ -128,43 +191,38 @@ export default function OrdersKanban({ orders }: OrdersKanbanProps) {
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        {COLUMNS.map((col) => {
-          const items = grouped[col.key];
-          return (
-            <div
+      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          {COLUMNS.map((col) => (
+            <DroppableColumn
               key={col.key}
-              className={`rounded-xl border ${col.accent} flex flex-col min-h-[200px]`}
-            >
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
-                <div className="flex items-center gap-2">
-                  {col.icon}
-                  <h3 className="font-semibold text-sm">{col.title}</h3>
-                </div>
-                <Badge variant="secondary" className="font-mono">{items.length}</Badge>
-              </div>
+              col={col}
+              items={grouped[col.key]}
+              downloadingId={downloadingId}
+              onDetails={setDetailsOrder}
+              onPayout={setPayoutOrder}
+              onDownload={handleDownload}
+            />
+          ))}
+        </div>
+      </DndContext>
 
-              <div className="p-3 space-y-3 flex-1">
-                {items.length === 0 ? (
-                  <p className="text-xs text-muted-foreground/60 text-center py-8">{col.empty}</p>
-                ) : (
-                  items.map((order) => (
-                    <OrderCard
-                      key={order.id}
-                      order={order}
-                      column={col.key}
-                      downloading={downloadingId === order.id}
-                      onDetails={() => setDetailsOrder(order)}
-                      onPayout={() => setPayoutOrder(order)}
-                      onDownload={() => handleDownload(order)}
-                    />
-                  ))
-                )}
-              </div>
-            </div>
+      {/* Мини-диалог: drop в «Проблемные» → выбрать cancelled / expired */}
+      <FailedDropDialog
+        order={failedDropOrder}
+        onClose={() => setFailedDropOrder(null)}
+        onPick={(status) => {
+          if (!failedDropOrder) return;
+          updateStatus.mutate(
+            { id: failedDropOrder.id, status },
+            {
+              onSuccess: () => toast.success("Заявка отмечена"),
+              onError: (e: Error) => toast.error("Не удалось", { description: e.message }),
+            }
           );
-        })}
-      </div>
+          setFailedDropOrder(null);
+        }}
+      />
 
       {/* Details Dialog */}
       <Dialog open={!!detailsOrder} onOpenChange={() => setDetailsOrder(null)}>
@@ -199,6 +257,8 @@ function OrderCard({ order, column, downloading, onDetails, onPayout, onDownload
   const ageMs = Date.now() - new Date(order.created_at).getTime();
   const isUrgent = column === "action_needed" && ageMs > URGENT_THRESHOLD_MS;
 
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: order.id });
+
   const fmt = (n: number) =>
     n < 1 ? n.toFixed(4) : n.toLocaleString("ru-RU", { maximumFractionDigits: 2 });
 
@@ -207,9 +267,12 @@ function OrderCard({ order, column, downloading, onDetails, onPayout, onDownload
 
   return (
     <div
-      className={`rounded-lg border bg-card px-3 py-2.5 space-y-2 transition-colors ${
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      className={`rounded-lg border bg-card px-3 py-2.5 space-y-2 transition-colors cursor-grab active:cursor-grabbing ${
         isUrgent ? "border-red-500/60 ring-1 ring-red-500/20" : "border-border/40"
-      }`}
+      } ${isDragging ? "opacity-50" : ""}`}
     >
       <div className="flex items-center justify-between text-xs">
         <span className="font-mono text-muted-foreground">#{idShort}</span>
@@ -269,6 +332,19 @@ function OrderCard({ order, column, downloading, onDetails, onPayout, onDownload
         </Button>
       )}
 
+      {/* Чек оплаты от клиента (если приложил) */}
+      {order.receipt_url && (
+        <a
+          href={order.receipt_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-xs text-primary hover:underline -mt-0.5"
+        >
+          <Paperclip className="w-3 h-3" />
+          Чек оплаты от клиента
+        </a>
+      )}
+
       {/* Вторичные действия */}
       <div className="flex justify-between pt-1 border-t border-border/30 -mx-3 px-3 mt-1">
         <Button onClick={onDetails} size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground">
@@ -279,6 +355,94 @@ function OrderCard({ order, column, downloading, onDetails, onPayout, onDownload
         </Button>
       </div>
     </div>
+  );
+}
+
+// ───────────────────────── Droppable column ─────────────────────────
+
+interface DroppableColumnProps {
+  col: typeof COLUMNS[number];
+  items: Order[];
+  downloadingId: string | null;
+  onDetails: (o: Order) => void;
+  onPayout: (o: Order) => void;
+  onDownload: (o: Order) => void;
+}
+
+function DroppableColumn({ col, items, downloadingId, onDetails, onPayout, onDownload }: DroppableColumnProps) {
+  const { isOver, setNodeRef } = useDroppable({ id: col.key });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`rounded-xl border ${col.accent} flex flex-col min-h-[200px] transition-all ${
+        isOver ? "ring-2 ring-primary/60 ring-offset-2 ring-offset-background" : ""
+      }`}
+    >
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+        <div className="flex items-center gap-2">
+          {col.icon}
+          <h3 className="font-semibold text-sm">{col.title}</h3>
+        </div>
+        <Badge variant="secondary" className="font-mono">{items.length}</Badge>
+      </div>
+
+      <div className="p-3 space-y-3 flex-1">
+        {items.length === 0 ? (
+          <p className="text-xs text-muted-foreground/60 text-center py-8">{col.empty}</p>
+        ) : (
+          items.map((order) => (
+            <OrderCard
+              key={order.id}
+              order={order}
+              column={col.key}
+              downloading={downloadingId === order.id}
+              onDetails={() => onDetails(order)}
+              onPayout={() => onPayout(order)}
+              onDownload={() => onDownload(order)}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────── Failed-drop dialog ─────────────────────────
+
+function FailedDropDialog({
+  order,
+  onClose,
+  onPick,
+}: {
+  order: Order | null;
+  onClose: () => void;
+  onPick: (status: string) => void;
+}) {
+  const [status, setStatus] = useState<string>("cancelled");
+  return (
+    <Dialog open={!!order} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Пометить как проблемную</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Заявка <span className="font-mono">#{order?.id.slice(0, 8)}</span> — что произошло?
+          </p>
+          <SelectStatus value={status} onValueChange={setStatus}>
+            <SelectStatusTrigger><SelectStatusValue /></SelectStatusTrigger>
+            <SelectStatusContent>
+              <SelectStatusItem value="cancelled">Отменена клиентом / нами</SelectStatusItem>
+              <SelectStatusItem value="expired">Истекла (нет оплаты)</SelectStatusItem>
+            </SelectStatusContent>
+          </SelectStatus>
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={onClose}>Отмена</Button>
+            <Button className="flex-1" onClick={() => onPick(status)}>Подтвердить</Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -311,6 +475,22 @@ function OrderDetailsBlock({ order }: { order: Order }) {
       )}
       {order.contact_info && order.contact_info !== order.wallet_address && (
         <Row label="Контакт" value={<span className="break-all">{order.contact_info}</span>} />
+      )}
+      {order.receipt_url && (
+        <Row
+          label="Чек оплаты"
+          value={
+            <a
+              href={order.receipt_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline inline-flex items-center gap-1"
+            >
+              <Paperclip className="w-3 h-3" />
+              Открыть
+            </a>
+          }
+        />
       )}
       {order.notes && <Row label="Заметки" value={<span className="text-xs whitespace-pre-wrap break-all">{order.notes}</span>} />}
     </div>

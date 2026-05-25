@@ -15,6 +15,7 @@ export interface Order {
   contact_info: string | null;
   notes: string | null;
   payment_method?: string | null;
+  receipt_url?: string | null;
   network: string | null;
   created_at: string;
   updated_at: string;

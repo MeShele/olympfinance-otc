@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Copy, Clock, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
+import { Copy, Clock, AlertTriangle, CheckCircle2, Loader2, Paperclip, Check, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { useUploadReceipt } from "@/hooks/useUploadReceipt";
 
 export interface PaymentData {
   type: 'crypto' | 'fiat';
@@ -25,6 +26,23 @@ interface PaymentInstructionsProps {
 
 const PaymentInstructions = ({ payment, orderId, onConfirmPayment, isConfirming }: PaymentInstructionsProps) => {
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [receiptUploaded, setReceiptUploaded] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadReceipt = useUploadReceipt();
+
+  const handleReceiptFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !orderId) return;
+    try {
+      await uploadReceipt.mutateAsync({ orderId, file });
+      setReceiptUploaded(true);
+      toast.success("Чек загружен");
+    } catch (err: unknown) {
+      toast.error("Не удалось загрузить", { description: (err as Error).message });
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   useEffect(() => {
     if (!payment.expires_at) return;
@@ -163,13 +181,51 @@ const PaymentInstructions = ({ payment, orderId, onConfirmPayment, isConfirming 
         </div>
       )}
 
+      {/* Receipt upload (опциональный, но ускоряет проверку оператором) */}
+      {orderId && (
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <Paperclip className="w-3 h-3" />
+            Чек оплаты (необязательно)
+          </Label>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,application/pdf"
+            className="hidden"
+            onChange={handleReceiptFile}
+            disabled={uploadReceipt.isPending}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full h-8 text-xs"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadReceipt.isPending}
+          >
+            {uploadReceipt.isPending ? (
+              <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+            ) : receiptUploaded ? (
+              <Check className="w-3.5 h-3.5 mr-1.5 text-green-600" />
+            ) : (
+              <Upload className="w-3.5 h-3.5 mr-1.5" />
+            )}
+            {receiptUploaded ? "Чек загружен — можно заменить" : "Прикрепить чек (JPG/PNG/PDF до 5 МБ)"}
+          </Button>
+          <p className="text-[10px] text-muted-foreground/70 leading-tight">
+            Прикрепление чека ускорит проверку оператором, но не обязательно.
+          </p>
+        </div>
+      )}
+
       {/* Confirm payment button */}
       {orderId && onConfirmPayment && (
         <Button
           type="button"
           className="w-full bg-green-600 hover:bg-green-700 text-white"
           onClick={() => onConfirmPayment(orderId)}
-          disabled={isConfirming}
+          disabled={isConfirming || uploadReceipt.isPending}
         >
           {isConfirming ? (
             <Loader2 className="w-4 h-4 mr-2 animate-spin" />

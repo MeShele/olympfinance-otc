@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Loader2, CheckCircle2 } from "lucide-react";
+import { Loader2, CheckCircle2, Search } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +17,7 @@ import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { useOperatorId } from "@/hooks/useOperatorId";
 import { buildCompanyData } from "@/utils/pdf/companyData";
 import { saveOrderPdfToStorage } from "@/utils/orderPdfDownload";
+import { invokeEdgeFunction } from "@/lib/edgeInvoke";
 
 interface PayoutConfirmDialogProps {
   order: Order | null;
@@ -25,11 +26,44 @@ interface PayoutConfirmDialogProps {
 
 const FIAT_CODES = ["RUB", "USD", "EUR", "KGS", "KZT", "UZS"];
 
+interface ExplorerResult {
+  confirmed: boolean;
+  confirmations: number;
+  from?: string;
+  to?: string;
+  amount?: string;
+  symbol?: string;
+  error?: string;
+  hint?: string;
+}
+
 export default function PayoutConfirmDialog({ order, onClose }: PayoutConfirmDialogProps) {
   const [txHash, setTxHash] = useState("");
+  const [explorer, setExplorer] = useState<ExplorerResult | null>(null);
+  const [isChecking, setIsChecking] = useState(false);
   const markCompleted = useMarkOrderCompleted();
   const { data: settings } = useCompanySettings();
   const operatorId = useOperatorId();
+
+  const handleCheckTx = async () => {
+    if (!txHash.trim() || !order?.network) {
+      toast.error("Введите tx-hash и убедитесь что сеть указана");
+      return;
+    }
+    setIsChecking(true);
+    setExplorer(null);
+    try {
+      const data = await invokeEdgeFunction("explorer-check", {
+        network: order.network,
+        tx_hash: txHash.trim(),
+      });
+      setExplorer(data as ExplorerResult);
+    } catch (e) {
+      setExplorer({ confirmed: false, confirmations: 0, error: (e as Error).message });
+    } finally {
+      setIsChecking(false);
+    }
+  };
 
   const isCrypto = order?.to_currency && !FIAT_CODES.includes(order.to_currency);
   const hashLabel = isCrypto ? "Хеш транзакции в блокчейне" : "Номер платёжного поручения";
@@ -95,16 +129,59 @@ export default function PayoutConfirmDialog({ order, onClose }: PayoutConfirmDia
 
             <div>
               <Label htmlFor="tx-hash" className="text-xs">{hashLabel}</Label>
-              <Input
-                id="tx-hash"
-                value={txHash}
-                onChange={(e) => setTxHash(e.target.value)}
-                placeholder={hashPlaceholder}
-                className="font-mono"
-              />
+              <div className="flex gap-1.5">
+                <Input
+                  id="tx-hash"
+                  value={txHash}
+                  onChange={(e) => setTxHash(e.target.value)}
+                  placeholder={hashPlaceholder}
+                  className="font-mono"
+                />
+                {isCrypto && order?.network && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={handleCheckTx}
+                    disabled={!txHash.trim() || isChecking}
+                    title="Проверить в blockchain explorer"
+                  >
+                    {isChecking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                  </Button>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Сохранится в карточке заявки для аудита. Можно оставить пустым.
               </p>
+
+              {explorer && !explorer.error && (
+                <div className="mt-2 p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    {explorer.confirmed ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                    ) : (
+                      <Loader2 className="w-3.5 h-3.5 text-amber-500" />
+                    )}
+                    <span className="font-medium">
+                      {explorer.confirmed ? "Транзакция подтверждена" : "В мемпуле / не подтверждена"}
+                    </span>
+                    <span className="text-muted-foreground">
+                      ({explorer.confirmations} конф.)
+                    </span>
+                  </div>
+                  {explorer.from && <div className="font-mono truncate">From: {explorer.from}</div>}
+                  {explorer.to && <div className="font-mono truncate">To: {explorer.to}</div>}
+                  {explorer.amount && (
+                    <div>Amount: {explorer.amount} {explorer.symbol ?? ""}</div>
+                  )}
+                </div>
+              )}
+              {explorer?.error && (
+                <div className="mt-2 p-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-xs text-red-700 dark:text-red-300">
+                  {explorer.error}
+                  {explorer.hint && <div className="text-muted-foreground mt-0.5">{explorer.hint}</div>}
+                </div>
+              )}
             </div>
           </div>
         )}

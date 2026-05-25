@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Loader2, Save, Trash2, Plus, HelpCircle, Info } from "lucide-react";
-import { useCompanySettings } from "@/hooks/useCompanySettings";
-import { Link } from "react-router-dom";
+import { Loader2, Save, Trash2, Plus, HelpCircle, Info, GraduationCap } from "lucide-react";
+import { useCompanySettings, useSaveCompanySettings } from "@/hooks/useCompanySettings";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,6 +48,21 @@ export default function AdminQuizQuestions() {
   const { data: questions, isLoading } = useAdminQuizQuestions(operatorId);
   const { data: companySettings } = useCompanySettings();
   const quizEnabled = companySettings?.quiz_enabled ?? true;
+  const { mutateAsync: saveCompany, isPending: isTogglingQuiz } = useSaveCompanySettings();
+
+  const handleQuizToggle = async (next: boolean) => {
+    if (!companySettings) return;
+    try {
+      await saveCompany({
+        settings: { quiz_enabled: next } as Partial<typeof companySettings>,
+        operatorId,
+      });
+      toast.success(next ? "Квиз включён" : "Квиз выключен");
+    } catch (e: unknown) {
+      toast.error("Не удалось сохранить", { description: (e as Error).message });
+    }
+  };
+
   const { mutate: saveQuestion, isPending: isSaving } = useSaveQuizQuestion();
   const { mutate: deleteQuestion, isPending: isDeleting } = useDeleteQuizQuestion();
   const [newQuestions, setNewQuestions] = useState<QuestionForm[]>([]);
@@ -108,21 +123,40 @@ export default function AdminQuizQuestions() {
 
   return (
     <RequirePermission section="company">
-    <div className="max-w-3xl">
-      {!quizEnabled && (
-        <div className="mb-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
-          <Info className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-          <div className="flex-1 text-sm">
-            <p className="font-medium text-amber-700 dark:text-amber-200">Модуль квиза выключен</p>
-            <p className="text-muted-foreground mt-1">
-              Вопросы ниже не показываются клиентам. Включите модуль в{" "}
-              <Link to="/admin/company" className="text-primary hover:underline font-medium">
-                Настройках компании → Модули
-              </Link>.
+    <div className="max-w-3xl space-y-4">
+      {/* Карточка управления модулем — заметнее, чем переключатель внутри
+          /admin/company → клиент его не находил. */}
+      <div className="admin-card">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3 flex-1">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+              <GraduationCap className="w-5 h-5 text-amber-500" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-foreground">Модуль «Тест знаний»</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Если включён — клиент проходит короткий тест перед первым обменом.
+                Рекомендуется для соответствия требованиям ГСФР. Дублируется
+                с переключателем в «Настройки → О компании → Модули».
+              </p>
+            </div>
+          </div>
+          <Switch
+            checked={quizEnabled}
+            disabled={isTogglingQuiz || !companySettings}
+            onCheckedChange={handleQuizToggle}
+          />
+        </div>
+        {!quizEnabled && (
+          <div className="mt-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-start gap-2">
+            <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-muted-foreground">
+              Модуль сейчас выключен — вопросы ниже не показываются клиентам.
             </p>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+
       <div className="admin-card">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">

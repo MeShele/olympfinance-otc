@@ -56,7 +56,7 @@ const settingsItems: MenuItem[] = [
   { title: "О компании", url: "/admin/company", icon: Building2, section: "company" },
   { title: "Комиссия", url: "/admin/commission", icon: Percent, section: "commission" },
   { title: "Юр. страницы", url: "/admin/legal", icon: Scale, section: "company" },
-  { title: "Квиз", url: "/admin/quiz", icon: HelpCircle, section: "company" },
+  { title: "Квиз и настройки", url: "/admin/quiz", icon: HelpCircle, section: "company" },
   { title: "Контент сайта", url: "/admin/content", icon: Type, section: "company" },
 ];
 
