@@ -353,7 +353,7 @@ export default function AdminCompliance() {
                       <TableCell className="text-muted-foreground text-xs">
                         {user.verification_method === 'biometric-vision' ? 'BV' :
                          user.verification_method === 'sumsub' ? 'SumSub' :
-                         user.verification_method === 'asystem-kyc' ? 'Fiatex' :
+                         user.verification_method === 'asystem-kyc' ? 'Manual KYC' :
                          user.verification_method || '—'}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
@@ -471,7 +471,7 @@ export default function AdminCompliance() {
                         if (m === 'biometric-vision') return 'Biometric Vision';
                         if (m === 'didit') return 'Didit';
                         if (m === 'sumsub') return 'SumSub';
-                        if (m === 'asystem' || m === 'asystem-kyc') return 'Fiatex KYC';
+                        if (m === 'asystem' || m === 'asystem-kyc') return 'Manual KYC';
                         if (m) return m;
                         // Legacy rows: infer from ocr_data shape
                         if (detailUser.ocr_data?.bv_status) return 'Biometric Vision';

@@ -1,4 +1,4 @@
-project_id = "fiatex-otc"
+project_id = "olympfinance-otc"
 
 # Manual KYC review with risk scoring (legacy slug `asystem-kyc`
 # kept to avoid breaking existing kyc_verifications.method values).

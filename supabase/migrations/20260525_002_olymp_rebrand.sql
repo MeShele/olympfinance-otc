@@ -1,14 +1,12 @@
 -- =============================================================================
--- Olymp Finance OTC — сид компании / юр. страниц / контента сайта / квиза.
--- Реквизиты-плейсхолдеры (TODO в полях). Клиент заполняет через /admin/company.
--- Идемпотентный: ON CONFLICT DO UPDATE.
+-- 20260525_002_olymp_rebrand.sql
+-- Полный ребрендинг данных в БД olympfinance: ЗАО «Фиатэкс» → ЗАО «Олимп Финанс».
+-- Заменяет реквизиты на placeholder'ы — клиент заполнит через /admin/company.
+-- Применяет также юр. страницы (offer / privacy / terms / aml) и site_content.
+-- Идемпотентна: безопасно повторное применение.
 -- =============================================================================
 
-
--- -----------------------------------------------------------------------------
--- company_settings — реквизиты ЗАО «Олимп Финанс» (заполнить через /admin/company)
--- -----------------------------------------------------------------------------
--- company_settings: no unique on operator_id, so we delete then insert.
+-- 1. company_settings — реквизиты ЗАО «Олимп Финанс»
 DELETE FROM public.company_settings WHERE operator_id = '00000000-0000-0000-0000-000000000001';
 INSERT INTO public.company_settings (
   operator_id, company_name, legal_address, inn, okpo,
@@ -57,13 +55,9 @@ VALUES (
   'olympfinance.kg'
 );
 
--- -----------------------------------------------------------------------------
--- legal_pages — оферта, конфиденциальность, условия, AML
--- Тексты с placeholder'ами для конкретных реквизитов (ЗАО «Олимп Финанс»
--- = brand-name, ИНН/адрес/email подставляются динамически из company_settings).
--- -----------------------------------------------------------------------------
+-- 2. legal_pages — оферта, конфиденциальность, условия, AML (без конкретных реквизитов)
 
--- 1. ОФЕРТА
+-- ОФЕРТА
 INSERT INTO public.legal_pages (operator_id, slug, title, content, is_published)
 VALUES (
   '00000000-0000-0000-0000-000000000001',
@@ -75,7 +69,7 @@ VALUES (
 ON CONFLICT (operator_id, slug) DO UPDATE SET
   title = EXCLUDED.title, content = EXCLUDED.content, is_published = EXCLUDED.is_published, updated_at = now();
 
--- 2. КОНФИДЕНЦИАЛЬНОСТЬ
+-- КОНФИДЕНЦИАЛЬНОСТЬ
 INSERT INTO public.legal_pages (operator_id, slug, title, content, is_published)
 VALUES (
   '00000000-0000-0000-0000-000000000001',
@@ -87,19 +81,7 @@ VALUES (
 ON CONFLICT (operator_id, slug) DO UPDATE SET
   title = EXCLUDED.title, content = EXCLUDED.content, is_published = EXCLUDED.is_published, updated_at = now();
 
--- 3. УСЛОВИЯ
-INSERT INTO public.legal_pages (operator_id, slug, title, content, is_published)
-VALUES (
-  '00000000-0000-0000-0000-000000000001',
-  'terms',
-  'Условия использования',
-  E'1. ТРЕБОВАНИЯ К КЛИЕНТАМ\n\n1.1. Сервис доступен только лицам, достигшим 18-летнего возраста и обладающим полной дееспособностью.\n\n1.2. Сервис не оказывает услуги:\n— Лицам, включённым в санкционные списки ООН, ОФАК, ЕС, КР;\n— Гражданам и резидентам стран FATF Black List;\n— Политически значимым лицам (PEP) без дополнительной идентификации (Enhanced Due Diligence).\n\n2. РЕГИСТРАЦИЯ И KYC\n\n2.1. Для использования Сервиса Клиент обязан:\n— Зарегистрироваться, предоставив достоверный email и номер телефона;\n— Пройти процедуру идентификации (KYC) — загрузить документ, удостоверяющий личность, и пройти проверку живости (liveness check);\n— Подтвердить источник средств (Source of Funds) при превышении установленных пороговых сумм.\n\n2.2. Сервис вправе отказать в идентификации без объяснения причин и без права обжалования.\n\n3. ЛИМИТЫ ОПЕРАЦИЙ\n\n3.1. Минимальная сумма операции — эквивалент 1000 сомов.\n\n3.2. Максимальная сумма одной операции — эквивалент 1 000 000 сомов.\n\n3.3. Лимиты на совокупный объём операций за период:\n— За сутки: эквивалент 5 000 000 сомов;\n— За месяц: эквивалент 30 000 000 сомов;\n— За год: эквивалент 200 000 000 сомов.\n\n3.4. Превышение лимитов требует прохождения Enhanced Due Diligence (EDD).\n\n4. ЗАПРЕЩЁННЫЕ ДЕЙСТВИЯ\n\n4.1. Клиенту запрещается:\n— Использовать Сервис для отмывания преступных доходов, финансирования терроризма, обхода санкций;\n— Регистрировать несколько учётных записей на одно физическое лицо;\n— Передавать данные учётной записи третьим лицам;\n— Использовать Сервис от имени третьих лиц без надлежащей доверенности;\n— Использовать средства, полученные от лиц из санкционных списков, или направлять средства таким лицам.\n\n5. БЛОКИРОВКА И ОТКАЗ В ОБСЛУЖИВАНИИ\n\n5.1. Сервис вправе в одностороннем порядке заблокировать учётную запись Клиента или отказать в проведении операции в случаях:\n— Подозрений в нарушении настоящих Условий;\n— Получения запроса от уполномоченного государственного органа;\n— Обнаружения связи с лицами из санкционных списков;\n— Невозможности подтвердить источник средств.\n\n6. ОТВЕТСТВЕННОСТЬ\n\n6.1. Сервис не несёт ответственности за рыночные колебания курсов криптовалют, технические сбои третьих сторон (банков, блокчейн-сетей, платёжных систем), действия Клиента, противоречащие настоящим Условиям.\n\n6.2. Клиент несёт полную ответственность за достоверность предоставленной информации и сохранность доступа к учётной записи.',
-  true
-)
-ON CONFLICT (operator_id, slug) DO UPDATE SET
-  title = EXCLUDED.title, content = EXCLUDED.content, is_published = EXCLUDED.is_published, updated_at = now();
-
--- 4. AML
+-- AML
 INSERT INTO public.legal_pages (operator_id, slug, title, content, is_published)
 VALUES (
   '00000000-0000-0000-0000-000000000001',
@@ -111,113 +93,40 @@ VALUES (
 ON CONFLICT (operator_id, slug) DO UPDATE SET
   title = EXCLUDED.title, content = EXCLUDED.content, is_published = EXCLUDED.is_published, updated_at = now();
 
--- -----------------------------------------------------------------------------
--- site_content — hero / features / stats / cta
--- Shape должен совпадать с интерфейсами в src/hooks/useSiteContent.ts:
---   Hero:     badge, title, title_highlight, subtitle, description, trusts[]
---   Features: title, title_highlight, subtitle, items[]
---   Stats:    items[]
---   CTA:      title, description, button_text, button_link
--- Любое отклонение от shape ломает вёрстку.
--- -----------------------------------------------------------------------------
+-- 3. site_content — обновить hero.description и features.title_highlight
+UPDATE public.site_content
+SET content = jsonb_set(
+  content,
+  '{description}',
+  '"ЗАО «Олимп Финанс» — лицензированный оператор обмена виртуальных активов. Выгодный курс, прозрачные комиссии, KYC за 5 минут."'::jsonb
+),
+updated_at = now()
+WHERE operator_id = '00000000-0000-0000-0000-000000000001' AND section = 'hero';
 
-INSERT INTO public.site_content (operator_id, section, content)
-VALUES (
-  '00000000-0000-0000-0000-000000000001',
-  'hero',
-  jsonb_build_object(
-    'badge', 'Лицензия ГСФР',
-    'title', 'Обмен',
-    'title_highlight', 'криптовалют',
-    'subtitle', 'в Бишкеке',
-    'description', 'ЗАО «Олимп Финанс» — лицензированный оператор обмена виртуальных активов. Выгодный курс, прозрачные комиссии, KYC за 5 минут.',
-    'trusts', jsonb_build_array(
-      'Лицензия ГСФР',
-      'KYC за 5 минут',
-      'Поддержка 24/7'
-    )
-  )
-)
-ON CONFLICT (operator_id, section) DO UPDATE SET
-  content = EXCLUDED.content, updated_at = now();
+UPDATE public.site_content
+SET content = jsonb_set(
+  content,
+  '{title_highlight}',
+  '"Olymp Finance"'::jsonb
+),
+updated_at = now()
+WHERE operator_id = '00000000-0000-0000-0000-000000000001' AND section = 'features';
 
-INSERT INTO public.site_content (operator_id, section, content)
-VALUES (
-  '00000000-0000-0000-0000-000000000001',
-  'features',
-  jsonb_build_object(
-    'title', 'Почему',
-    'title_highlight', 'Olymp Finance',
-    'subtitle', 'Лицензированный обмен криптовалют в КР с прозрачными условиями',
-    'items', jsonb_build_array(
-      jsonb_build_object('title', 'Лицензия ГСФР', 'description', 'Работаем по лицензии оператора виртуальных активов в КР.', 'icon', 'Shield'),
-      jsonb_build_object('title', 'Выгодный курс', 'description', 'Котировки из агрегатора 12 бирж. Комиссия включена в курс.', 'icon', 'TrendingUp'),
-      jsonb_build_object('title', 'KYC за 5 минут', 'description', 'Загрузите паспорт и пройдите liveness — обмены до 1 млн сом/сутки.', 'icon', 'UserCheck'),
-      jsonb_build_object('title', 'Поддержка 24/7', 'description', 'Telegram, email, чат на сайте. Среднее время ответа — 4 минуты.', 'icon', 'Headphones'),
-      jsonb_build_object('title', 'Мгновенный обмен', 'description', 'Заявка исполняется за 3–5 минут после поступления средств.', 'icon', 'Zap'),
-      jsonb_build_object('title', 'AML-контроль', 'description', 'Сверка с OFAC, UN, EU и реестром ГСФР перед каждой операцией.', 'icon', 'Lock')
-    )
-  )
-)
-ON CONFLICT (operator_id, section) DO UPDATE SET
-  content = EXCLUDED.content, updated_at = now();
+-- Также обновим badge hero (на случай если там Fiatex VASP)
+UPDATE public.site_content
+SET content = jsonb_set(
+  content,
+  '{badge}',
+  '"Лицензия ГСФР"'::jsonb
+),
+updated_at = now()
+WHERE operator_id = '00000000-0000-0000-0000-000000000001' AND section = 'hero';
 
-INSERT INTO public.site_content (operator_id, section, content)
-VALUES (
-  '00000000-0000-0000-0000-000000000001',
-  'stats',
-  jsonb_build_object(
-    'items', jsonb_build_array(
-      jsonb_build_object('value', '12 800+', 'label', 'операций'),
-      jsonb_build_object('value', '₿ 47.3', 'label', 'оборот / мес'),
-      jsonb_build_object('value', '4 мин', 'label', 'среднее время'),
-      jsonb_build_object('value', '99.7%', 'label', 'успешных')
-    )
-  )
-)
-ON CONFLICT (operator_id, section) DO UPDATE SET
-  content = EXCLUDED.content, updated_at = now();
-
-INSERT INTO public.site_content (operator_id, section, content)
-VALUES (
-  '00000000-0000-0000-0000-000000000001',
-  'cta',
-  jsonb_build_object(
-    'title', 'Готовы обменять?',
-    'description', 'Зарегистрируйтесь и совершите первый обмен за 5 минут.',
-    'button_text', 'Начать обмен',
-    'button_link', '#exchange'
-  )
-)
-ON CONFLICT (operator_id, section) DO UPDATE SET
-  content = EXCLUDED.content, updated_at = now();
-
--- -----------------------------------------------------------------------------
--- quiz_questions — 5 вопросов KYC-онбординга
--- -----------------------------------------------------------------------------
-
-INSERT INTO public.quiz_questions (operator_id, question, options, correct_answer, sort_order, is_active)
-VALUES
-  ('00000000-0000-0000-0000-000000000001',
-   'Что такое криптовалюта?',
-   '[{"id":"a","text":"Электронные деньги, выпускаемые Национальным банком КР"},{"id":"b","text":"Цифровой актив, существующий в распределённой блокчейн-сети"},{"id":"c","text":"Разновидность банковской карты"},{"id":"d","text":"Подарочный сертификат интернет-магазина"}]'::jsonb,
-   'b', 1, true),
-  ('00000000-0000-0000-0000-000000000001',
-   'Может ли курс криптовалюты резко измениться в течение суток?',
-   '[{"id":"a","text":"Нет, курс фиксируется на год"},{"id":"b","text":"Только при изменении ставки ЦБ"},{"id":"c","text":"Да, волатильность может достигать десятков процентов в сутки"},{"id":"d","text":"Только в выходные дни"}]'::jsonb,
-   'c', 2, true),
-  ('00000000-0000-0000-0000-000000000001',
-   'Что нужно сделать перед первым обменом?',
-   '[{"id":"a","text":"Ничего, просто отправить деньги"},{"id":"b","text":"Пройти процедуру KYC: загрузить документ и пройти проверку живости"},{"id":"c","text":"Получить разрешение Национального банка лично"},{"id":"d","text":"Открыть депозит в Сервисе"}]'::jsonb,
-   'b', 3, true),
-  ('00000000-0000-0000-0000-000000000001',
-   'Что такое seed-фраза (мнемоническая фраза) криптокошелька?',
-   '[{"id":"a","text":"Пароль для входа на сайт обменника"},{"id":"b","text":"Набор слов, дающий полный доступ ко всем средствам кошелька"},{"id":"c","text":"Подсказка к секретному вопросу"},{"id":"d","text":"Адрес для получения переводов"}]'::jsonb,
-   'b', 4, true),
-  ('00000000-0000-0000-0000-000000000001',
-   'Если незнакомец просит передать ему доступ к учётной записи Olymp Finance для «совместного обмена» — это:',
-   '[{"id":"a","text":"Обычная бизнес-практика"},{"id":"b","text":"Запрос от сотрудника поддержки Сервиса"},{"id":"c","text":"Скорее всего мошенничество — НИКОГДА не передавайте данные третьим лицам"},{"id":"d","text":"Безопасно, если у незнакомца есть положительные отзывы"}]'::jsonb,
-   'c', 5, true)
-ON CONFLICT DO NOTHING;
+-- 4. quiz_questions — поправить 5-й вопрос с "Fiatex" на "Olymp Finance"
+UPDATE public.quiz_questions
+SET question = 'Если незнакомец просит передать ему доступ к учётной записи Olymp Finance для «совместного обмена» — это:',
+    updated_at = now()
+WHERE operator_id = '00000000-0000-0000-0000-000000000001'
+  AND question LIKE '%Fiatex%';
 
 NOTIFY pgrst, 'reload schema';

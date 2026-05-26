@@ -215,7 +215,7 @@ const OrderHistory = React.forwardRef<
 
   /**
    * Pull the latest KYC verification for the order's user and normalize
-   * identity fields. Providers (BV, Fiatex, SumSub, Didit) store different
+   * identity fields. Providers (BV, manual, SumSub, Didit) store different
    * shapes — this is the one place that flattens them into KycData for the
    * PDF template.
    */

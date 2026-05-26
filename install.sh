@@ -86,7 +86,7 @@ SUPABASE_KEY="${SUPABASE_KEY:-$(ask 'Supabase publishable key (anon JWT или s
 [ -z "$SUPABASE_URL" ] && { err "SUPABASE_URL required"; exit 1; }
 [ -z "$SUPABASE_KEY" ] && { err "SUPABASE_KEY required"; exit 1; }
 
-INSTALL_DIR="${INSTALL_DIR:-/opt/fiatex}"
+INSTALL_DIR="${INSTALL_DIR:-/opt/olymp}"
 mkdir -p "$INSTALL_DIR"
 cd "$INSTALL_DIR"
 
@@ -125,7 +125,7 @@ services:
 
   caddy:
     image: caddy:2-alpine
-    container_name: fiatex-caddy
+    container_name: olymp-caddy
     ports:
       - "80:80"
       - "443:443"

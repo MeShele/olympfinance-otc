@@ -29,7 +29,7 @@ const isStaleChunkError = (err: unknown): boolean => {
 };
 
 // Guard against reload loops: only auto-reload once per tab life.
-const STALE_RELOAD_KEY = "fiatex:stale-chunk-reloaded";
+const STALE_RELOAD_KEY = "olymp:stale-chunk-reloaded";
 
 class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
