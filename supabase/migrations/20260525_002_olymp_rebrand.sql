@@ -41,7 +41,7 @@ VALUES (
   'TODO: заполнить через /admin/company',
   'Нет',
   'Нет',
-  NULL,
+  0,
   'TODO: поставщик ликвидности',
   'TODO',
   'TODO',
