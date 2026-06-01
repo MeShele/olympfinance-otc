@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { mergePaymentIntoNotes } from "./orderUtils";
+import { mergePaymentIntoNotes, requiresMemo, generateMemo } from "./orderUtils";
 import { extractPaymentMethod } from "@/utils/orderNotes";
 
 interface SwapOrderParams {
@@ -36,6 +36,9 @@ export async function executeSwapOrder(params: SwapOrderParams) {
     walletAddress = '';
   }
 
+  // memo для memo-сетей (TON и др.) — уникальный на ордер для атрибуции.
+  const memo = requiresMemo(network) ? generateMemo() : undefined;
+
   // Build notes with payment info BEFORE insert (users have no UPDATE RLS policy)
   let finalNotes = params.notes;
   if (walletAddress) {
@@ -44,6 +47,7 @@ export async function executeSwapOrder(params: SwapOrderParams) {
       wallet_address: walletAddress,
       network,
       qr_url: qrUrl,
+      memo,
       amount: params.fromAmount,
       currency: params.fromCurrency,
       expires_at: params.expiresAt,
@@ -87,6 +91,7 @@ export async function executeSwapOrder(params: SwapOrderParams) {
         expiresAt: params.expiresAt,
         paymentType: 'crypto' as const,
         qrCode: qrUrl,
+        memo,
       },
     };
   }

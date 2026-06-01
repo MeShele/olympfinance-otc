@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Wallet, MessageSquare, ArrowRight, CheckCircle2, Copy, Clock, Globe, QrCode } from "lucide-react";
+import { Loader2, Wallet, MessageSquare, ArrowRight, CheckCircle2, Copy, Clock, Globe, QrCode, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { invokeEdgeFunction } from "@/lib/edgeInvoke";
@@ -37,6 +37,8 @@ interface PaymentInfo {
   expiresAt: string;
   qrCode?: string;
   paymentUrl?: string;
+  /** memo/destination-tag для memo-сетей (TON и др.) — обязателен при отправке */
+  memo?: string;
   /** For fiat payments — structured bank details */
   bankDetails?: string;
   /** 'crypto' = send to wallet, 'fiat' = send to bank */
@@ -468,11 +470,30 @@ const OrderFormModal = ({ open, onOpenChange, orderData, onSubmit, adminWallets,
             </div>
 
             <div className="text-center py-3 rounded-xl bg-secondary/50">
-              <p className="text-xs text-muted-foreground mb-1">Сумма к переводу</p>
+              <p className="text-xs text-muted-foreground mb-1">
+                {isFiatPayment ? "Сумма к переводу" : "Отправьте ровно"}
+              </p>
               <div className="flex items-baseline justify-center gap-1.5">
-                <span className="text-2xl font-bold">{paymentInfo.amount}</span>
+                <span className="text-2xl font-bold tabular-nums">{paymentInfo.amount}</span>
                 <span className="text-lg font-medium text-muted-foreground">{paymentInfo.currency}</span>
               </div>
+              {!isFiatPayment && paymentStatus === 'pending' && (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 h-7 text-xs"
+                    onClick={() => copyToClipboard(String(paymentInfo.amount), 'Сумма')}
+                  >
+                    <Copy className="w-3 h-3 mr-1.5" />
+                    Копировать сумму
+                  </Button>
+                  <p className="text-[11px] text-muted-foreground mt-1.5">
+                    Точная сумма — иначе зачисление задержится
+                  </p>
+                </>
+              )}
               {!isFiatPayment && paymentInfo.network && (
                 <p className="text-xs text-muted-foreground mt-1">Сеть: {paymentInfo.network}</p>
               )}
@@ -562,6 +583,45 @@ const OrderFormModal = ({ open, onOpenChange, orderData, onSubmit, adminWallets,
                     </Button>
                   </div>
                 </div>
+
+                {/* Memo / destination-tag — обязателен для memo-сетей (TON и др.) */}
+                {paymentInfo.memo && paymentStatus === 'pending' && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Memo / Тег (обязательно)</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={paymentInfo.memo}
+                        readOnly
+                        className="font-mono text-xs bg-secondary/50"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="shrink-0"
+                        onClick={() => copyToClipboard(paymentInfo.memo!, 'Memo')}
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <p className="flex items-start gap-1.5 text-[11px] leading-snug text-destructive">
+                      <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+                      Без memo средства не зачислятся — укажите его при отправке.
+                    </p>
+                  </div>
+                )}
+
+                {/* Предупреждение о сети — для всей крипты (самая дорогая ошибка) */}
+                {paymentInfo.network && paymentStatus === 'pending' && (
+                  <div className="flex items-start gap-2 rounded-lg border border-accent/50 bg-accent/10 px-3 py-2 text-xs leading-snug text-foreground">
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>
+                      Отправляйте только по сети{" "}
+                      <span className="font-mono font-semibold">{paymentInfo.network}</span>.
+                      Перевод по другой сети = безвозвратная потеря средств.
+                    </span>
+                  </div>
+                )}
               </>
             )}
 
@@ -596,7 +656,7 @@ const OrderFormModal = ({ open, onOpenChange, orderData, onSubmit, adminWallets,
               <div className="text-center py-4">
                 <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-2" />
                 <p className="font-medium">Заявка отправлена на проверку</p>
-                <p className="text-sm text-muted-foreground">Оператор проверит оплату и завершит обмен</p>
+                <p className="text-sm text-muted-foreground">Ждём поступления в сети — оператор подтвердит после сетевых подтверждений и завершит обмен</p>
               </div>
             )}
 

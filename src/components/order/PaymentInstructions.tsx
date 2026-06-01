@@ -11,6 +11,8 @@ export interface PaymentData {
   wallet_address?: string;
   network?: string;
   qr_url?: string;
+  /** memo/destination-tag для memo-сетей (TON и др.) — обязателен при отправке */
+  memo?: string;
   bank_details?: string;
   amount: number;
   currency: string;
@@ -108,10 +110,24 @@ const PaymentInstructions = ({ payment, orderId, onConfirmPayment, isConfirming 
 
       {/* Amount */}
       <div className="text-center py-2 rounded-lg bg-secondary/50">
-        <p className="text-xs text-muted-foreground">Сумма к переводу</p>
-        <p className="text-lg font-bold">
+        <p className="text-xs text-muted-foreground">
+          {payment.type === 'crypto' ? 'Отправьте ровно' : 'Сумма к переводу'}
+        </p>
+        <p className="text-lg font-bold tabular-nums">
           {payment.amount} <span className="text-sm font-medium text-muted-foreground">{payment.currency}</span>
         </p>
+        {payment.type === 'crypto' && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-1.5 h-7 text-xs"
+            onClick={() => copyToClipboard(String(payment.amount), 'Сумма')}
+          >
+            <Copy className="w-3 h-3 mr-1.5" />
+            Копировать сумму
+          </Button>
+        )}
       </div>
 
       {/* Crypto payment */}
@@ -156,6 +172,41 @@ const PaymentInstructions = ({ payment, orderId, onConfirmPayment, isConfirming 
               </Button>
             </div>
           </div>
+
+          {/* Memo / тег — обязателен для memo-сетей (TON и др.) */}
+          {payment.memo && (
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Memo / Тег (обязательно)</Label>
+              <div className="flex gap-1.5">
+                <Input value={payment.memo} readOnly className="font-mono text-xs bg-secondary/50 h-8" />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0 h-8 w-8"
+                  onClick={() => copyToClipboard(payment.memo!, 'Memo')}
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+              <p className="flex items-start gap-1.5 text-[11px] leading-snug text-destructive">
+                <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+                Без memo средства не зачислятся — укажите его при отправке.
+              </p>
+            </div>
+          )}
+
+          {/* Предупреждение о сети — для всей крипты (самая дорогая ошибка) */}
+          {payment.network && (
+            <div className="flex items-start gap-2 rounded-lg border border-accent/50 bg-accent/10 px-2.5 py-2 text-[11px] leading-snug text-foreground">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span>
+                Отправляйте только по сети{" "}
+                <span className="font-mono font-semibold">{payment.network}</span>.
+                Перевод по другой сети = безвозвратная потеря средств.
+              </span>
+            </div>
+          )}
         </div>
       )}
 

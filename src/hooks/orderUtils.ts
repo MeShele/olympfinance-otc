@@ -31,6 +31,28 @@ export const fetchAmountKgs = async (
   }
 };
 
+/**
+ * Сети с поддержкой memo/destination-tag. На общем (статическом) депозит-адресе
+ * уникальный memo на ордер даёт чистую атрибуцию «кто заплатил» — оператор
+ * сверяет поступление по memo. Не-memo сети (BTC/ETH/USDT…) атрибутируются по
+ * адресу-отправителю + сумме + ручному подтверждению. Расширяемо: XRP/XLM/EOS/ATOM
+ * по мере добавления этих сетей в каталог.
+ */
+export const MEMO_NETWORKS = new Set(["TON"]);
+
+export const requiresMemo = (network?: string | null): boolean =>
+  !!network && MEMO_NETWORKS.has(network.toUpperCase());
+
+/**
+ * Короткий числовой memo, уникальный на ордер (digits из случайного UUID).
+ * Числовой, потому что memo-цепочки (TON comment, XRP destination-tag) ждут
+ * целое/строку без спецсимволов.
+ */
+export const generateMemo = (): string => {
+  const digits = crypto.randomUUID().replace(/\D/g, "");
+  return (digits.slice(0, 9) || "0").padStart(6, "0");
+};
+
 /** Merge payment data into existing notes JSON */
 export const mergePaymentIntoNotes = (
   existingNotes: string | undefined,

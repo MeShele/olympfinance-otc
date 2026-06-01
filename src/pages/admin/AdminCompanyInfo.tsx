@@ -1,13 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2, Save, Building2, CreditCard, Palette, Upload, Image, GraduationCap } from "lucide-react";
+import { Loader2, Save, Building2, CreditCard, Palette, Upload, Image, GraduationCap, AlertTriangle } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { hslStringToHex } from "@/contexts/BrandingContext";
 import { useCompanySettings, useSaveCompanySettings, CompanySettings } from "@/hooks/useCompanySettings";
 import NetworkWalletField, { NetworkWallet, emptyNetworkWallet, parseNetworkWallets, serializeNetworkWallets } from "@/components/admin/NetworkWalletField";
+import { useCurrencies } from "@/hooks/useCurrencies";
 import { useOperatorId } from "@/hooks/useOperatorId";
 import LiquidityProvidersSection from "@/components/admin/LiquidityProvidersSection";
 import { supabase } from "@/integrations/supabase/client";
@@ -107,6 +108,31 @@ export default function AdminCompanyInfo() {
   const [form, setForm] = useState<Record<string, any>>(defaultSettings);
 
   const [manualWallets, setManualWallets] = useState<NetworkWallet[]>([{ ...emptyNetworkWallet }]);
+
+  const { data: currencies } = useCurrencies();
+
+  // Сети активных крипто-валют без депозит-адреса → клиент такую монету/сеть не
+  // увидит (filterNetworksByWallets её отфильтрует). Делаем дыру видимой оператору.
+  const missingWalletNetworks = useMemo(() => {
+    const have = new Set(
+      manualWallets.filter((w) => w.network && w.address).map((w) => w.network.toUpperCase()),
+    );
+    const missing = new Map<string, Set<string>>(); // network → coins
+    (currencies ?? [])
+      .filter((c) => c.type === "crypto")
+      .forEach((c) => {
+        c.networks.forEach((net) => {
+          if (!have.has(net.toUpperCase())) {
+            if (!missing.has(net)) missing.set(net, new Set());
+            missing.get(net)!.add(c.code);
+          }
+        });
+      });
+    return Array.from(missing.entries()).map(([network, coins]) => ({
+      network,
+      coins: Array.from(coins),
+    }));
+  }, [currencies, manualWallets]);
 
   useEffect(() => {
     if (settings) {
@@ -488,6 +514,22 @@ export default function AdminCompanyInfo() {
                   values={manualWallets}
                   onChange={setManualWallets}
                   enableQRUpload={true}
+                  warning={
+                    missingWalletNetworks.length > 0 ? (
+                      <div className="flex items-start gap-2 rounded-lg border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-xs leading-snug text-amber-900 dark:text-amber-100">
+                        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <p className="font-medium">Не у всех валют есть кошелёк — клиенты их не увидят.</p>
+                          {missingWalletNetworks.map((m) => (
+                            <p key={m.network}>
+                              Сеть <span className="font-mono font-medium">{m.network}</span> ({m.coins.join(", ")}) — нет адреса.
+                            </p>
+                          ))}
+                          <p className="opacity-80">Добавьте адрес кошелька для этих сетей.</p>
+                        </div>
+                      </div>
+                    ) : undefined
+                  }
                 />
               </div>
 

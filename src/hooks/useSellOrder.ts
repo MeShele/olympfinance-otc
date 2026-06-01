@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { invokeEdgeFunction } from "@/lib/edgeInvoke";
-import { mergePaymentIntoNotes } from "./orderUtils";
+import { mergePaymentIntoNotes, requiresMemo, generateMemo } from "./orderUtils";
 import { extractPaymentMethod } from "@/utils/orderNotes";
 
 interface SellOrderParams {
@@ -90,11 +90,16 @@ async function executeManualSell(
     .update({ status: 'awaiting_payment' })
     .eq('id', pendingPayment.id);
 
+  // memo/destination-tag для memo-сетей (TON и др.): уникальный на ордер →
+  // атрибуция поступления на общий депозит-адрес. Не-memo сети — undefined.
+  const memo = requiresMemo(params.network) ? generateMemo() : undefined;
+
   const paymentData = {
     type: 'crypto' as const,
     wallet_address: walletAddress,
     network: params.network,
     qr_url: qrUrl,
+    memo,
     amount: params.fromAmount,
     currency: params.fromCurrency,
     expires_at: params.expiresAt,
@@ -136,6 +141,7 @@ async function executeManualSell(
       currency: params.fromCurrency,
       expiresAt: params.expiresAt,
       qrCode: qrUrl,
+      memo,
     },
     isPendingPayment: true,
   };
