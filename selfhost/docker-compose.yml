@@ -1,0 +1,170 @@
+# OlympFinance OTC — self-hosted Supabase (orion), изолированный стек деска.
+# Урезанный шаблон main asystem-selfhost (fiatex-exchange/selfhost): без
+# cloudflared (туннель общий, контейнер asystem-cloudflared подключается к этой
+# сети через `docker network connect`), без studio/meta (psql по ssh).
+# Запуск ТОЛЬКО с env-файлом:  docker compose --env-file stackenv up -d
+name: olymp-selfhost
+
+services:
+  db:
+    image: supabase/postgres:17.6.1.133
+    container_name: olymp-db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+      JWT_SECRET: ${JWT_SECRET}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./volumes/db/01-roles.sh:/docker-entrypoint-initdb.d/01-roles.sh:ro
+
+  db-init:
+    image: supabase/postgres:17.6.1.133
+    container_name: olymp-db-init
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./volumes/db/init-roles.sh:/init-roles.sh:ro
+    entrypoint: ["bash", "/init-roles.sh"]
+
+  auth:
+    image: supabase/auth:v2.189.0
+    container_name: olymp-auth
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: ${SUPABASE_PUBLIC_URL}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      GOTRUE_SITE_URL: ${SITE_URL}
+      GOTRUE_URI_ALLOW_LIST: ${ADDITIONAL_REDIRECT_URLS}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "${GOTRUE_MAILER_AUTOCONFIRM:-true}"
+      GOTRUE_SMTP_ADMIN_EMAIL: ${MAIL_FROM:-}
+      GOTRUE_SMTP_MAX_FREQUENCY: 30s
+
+  rest:
+    image: postgrest/postgrest:v12.2.3
+    container_name: olymp-rest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public,storage,graphql_public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_APP_SETTINGS_JWT_SECRET: ${JWT_SECRET}
+    command: ["postgrest"]
+
+  storage:
+    image: supabase/storage-api:v1.60.10
+    container_name: olymp-storage
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      rest:
+        condition: service_started
+      imgproxy:
+        condition: service_started
+    environment:
+      ANON_KEY: ${SUPABASE_ANON_KEY}
+      SERVICE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      POSTGREST_URL: http://rest:3000
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      FILE_SIZE_LIMIT: 52428800
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: stub
+      REGION: local
+      GLOBAL_S3_BUCKET: stub
+      ENABLE_IMAGE_TRANSFORMATION: "true"
+      IMGPROXY_URL: http://imgproxy:5001
+    volumes:
+      - storage-data:/var/lib/storage
+
+  imgproxy:
+    image: darthsim/imgproxy:v3.8.0
+    container_name: olymp-imgproxy
+    restart: unless-stopped
+    environment:
+      IMGPROXY_BIND: ":5001"
+      IMGPROXY_LOCAL_FILESYSTEM_ROOT: /
+      IMGPROXY_USE_ETAG: "true"
+      IMGPROXY_ENABLE_WEBP_DETECTION: "true"
+    volumes:
+      - storage-data:/var/lib/storage
+
+  functions:
+    image: supabase/edge-runtime:v1.67.4
+    container_name: olymp-functions
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_DB_URL: postgres://supabase_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      DATABASE_URL: postgres://supabase_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      VERIFY_JWT: "false"
+      ALLOWED_ORIGIN: ${ALLOWED_ORIGIN:-*}
+      # Весь env-след 4 функций деска (nbkr-rates/create-staff-member/asystem-kyc/explorer-check)
+      ETHERSCAN_API_KEY: ${ETHERSCAN_API_KEY:-}
+      PLATFORM_BASE_DOMAIN: ${PLATFORM_BASE_DOMAIN:-asystem.ai}
+      PLATFORM_SUPPORT_EMAIL: ${PLATFORM_SUPPORT_EMAIL:-}
+    volumes:
+      - ../supabase/functions:/home/deno/functions:ro
+      - ./volumes/functions/main:/home/deno/main:ro
+    command:
+      - start
+      - --main-service
+      - /home/deno/main
+
+  kong:
+    image: kong:3.8
+    container_name: olymp-kong
+    restart: unless-stopped
+    depends_on:
+      - auth
+      - rest
+      - storage
+      - functions
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors
+    volumes:
+      - ./volumes/api/kong.yml:/var/lib/kong/kong.yml:ro
+    expose:
+      - "8000"
+
+volumes:
+  db-data:
+  storage-data:
