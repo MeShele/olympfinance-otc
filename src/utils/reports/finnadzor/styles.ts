@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import { isKgResident } from '@/lib/country';
 
 // === Types ===
 
@@ -250,8 +251,10 @@ export const getResidencyStatus = (
 ): string => {
   if (is_resident === true) return 'резидент КР';
   if (is_resident === false) return 'нерезидент КР';
-  if (!kyc_country) return 'резидент КР';
-  return kyc_country === 'KGZ' ? 'резидент КР' : 'нерезидент КР';
+  const norm = isKgResident(kyc_country);
+  if (norm === true) return 'резидент КР';
+  if (norm === false) return 'нерезидент КР';
+  return 'не определено'; // НЕ дефолтим в «резидент» (недо-репорт нерезидентов) — комплаенс резолвит
 };
 
 export const getMonthGenitive = (date: Date): string => {
@@ -337,7 +340,7 @@ const EU_COUNTRIES = new Set([
 export const COUNTRY_KEYS = ['RUS', 'KAZ', 'TJK', 'TKM', 'CHN', 'USA', 'EU', 'OTHER'] as const;
 
 export const mapCountryToColumn = (code: string | null): string => {
-  if (!code || code === 'KGZ') return ''; // residents excluded
+  if (!code || isKgResident(code) === true) return ''; // KG-резиденты исключены (нормализовано)
   if (code === 'RUS') return 'RUS';
   if (code === 'KAZ') return 'KAZ';
   if (code === 'TJK') return 'TJK';

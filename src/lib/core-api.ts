@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 const CORE_API_URL = import.meta.env.VITE_CORE_API_URL || "";
 
 const DEFAULT_CORE_API =
-  "https://aqduzkcsiausbjyltpsa.supabase.co/functions/v1/core-gateway";
+  "https://api.asystem.ai/functions/v1/core-gateway";
 
 interface CoreAPIResponse<T = unknown> {
   data: T | null;
