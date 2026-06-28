@@ -21,6 +21,7 @@ import {
   COUNTRY_KEYS,
   mapCountryToColumn,
 } from './styles';
+import { isKgResident } from '@/lib/country';
 
 // === Sheet 1: Приложение 1/о — Общие сведения ===
 
@@ -347,7 +348,7 @@ export const buildApp3Sheet = (
     const ir = (o as { is_resident?: boolean | null }).is_resident;
     if (ir === false) return true;
     if (ir === true) return false;
-    return !!(o.kyc_country && o.kyc_country !== 'KGZ');
+    return isKgResident(o.kyc_country) === false; // нормализовано: KG/KGZ/Kyrgyzstan → резидент
   };
 
   // Распределение по столбцам Приложения 3/о. Если страна неизвестна
